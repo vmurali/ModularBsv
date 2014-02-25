@@ -8,12 +8,9 @@ type WireWidth = Integer
 
 type Wire = (WireName, WireWidth)
 
-data Who = Rule | Method
-  deriving (Show, Read, Eq)
-
 data Binding = Binding
   { wire :: Wire
-  , who :: Who
+  , isRule :: Bool
   , expr :: Expr
   } deriving (Show, Read, Eq)
 
