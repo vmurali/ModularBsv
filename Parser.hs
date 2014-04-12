@@ -5,6 +5,7 @@ import Control.Exception (assert)
 import Control.Applicative hiding ((<|>), many)
 import Data.Char
 import Data.List
+import qualified Data.String as S
 
 import Text.Parsec hiding (token)
 import Text.Parsec.String
@@ -74,7 +75,7 @@ data Fp = Fp {fpName :: String
 data MExpression = MExpression {cond :: Maybe String 
 	, moduleName :: String
 	, calledMethod :: String 
-	, args :: [ String ]
+	, argsM :: [ String ]
 }
 
 
@@ -132,25 +133,48 @@ nameParser = do
 	wSpace
 	return $ name  		  
 
-instanceParser :: Parser Instance
-instanceParser = do 
-	name <- identifier
-	wSpace
-	string "ABSTRACT:"
-	wSpace
-	interfaceName <- identifier
-	wSpace
-
 --
 -- Parser for Module
 -- TODO
 
+--
+-- Parser for instance
+--
+-- Instances: 
+-- [{
+--    instName: proc
+--    moduleName: mkProc
+--    args : [names] // doc for instance (keyword :AP inst 
+-- We check the formal parameters with _fp at the end of the module name
 
 
+instancesParser :: Parser [Instance]
+instancesParser = do
+	listInstances <- many $ instanceParser
+	listFp <- apInstanceDocParser
+	return $ process listInstances listFp		
+	  where (onlyFpInstances,_) = partition (\x -> S.endswith "_fp" (moduleName x)) listInstances
+		process (t:q) ((_,r):s) =(t{args=r} :(process q s))
+		process [] [] = []
+
+ 
+instanceParser :: Parser Instance
+instanceParser = do
+	toTrash <-many $ anyChar <* notFollowedBy (identifier <* string " :: ABSTRACT")
+	nameInst <- identifier
+	emptyArea *> string ":: ABSTRACT:" <* emptyArea
+	notImportant <- guardParser        --Well, not important but we store, never know
+	emptyArea *> string "=" <* emptyArea 
+	nameModule <- identifier <* emptyArea
+	return $ Instance {instName = nameInst 
+			; moduleName = nameModule 
+			; args = undefined }
+
+
+ 
 --
 --Parsers for bindings
 --
-
 
 bindingParser :: Parser Binding 
 bindingParser = do
@@ -222,7 +246,7 @@ ruleParser = do
 	return $ Rule{ruleName = processedName 
 			; ruleGuard = guard
 			; ruleBody = toMExpr listExpr}
-	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = x; moduleName = t; calledMethod = y; args = z})	
+	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = x; moduleName = t; calledMethod = y; argsM = z})	
 
 
 --
@@ -318,26 +342,28 @@ methodBodyParser = do
 			; methodType = undefined
 			; methodArgs = undefined
 			; methodBody = toMExpr listExpr}
-	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = x; moduleName = t; calledMethod = y; args = z})	
+	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = x; moduleName = t; calledMethod = y; argsM = z})	
 
 
 
 
+
+--
+-- Parser for conflicts
+-- TODO
 
 
 --	
--- Parsers for instances with formal parameters
---
+-- Parsers for types of methods  in instances with formal parameters
+-- SOME TODO
 
-bodyInstanceParser :: Parser (String, String) 
+bodyInstanceParser :: Parser [([Maybe Integer], Maybe Integer, Maybe Integer)]
 bodyInstanceParser = do
-	moduleName <- identifier
-	(whatever, blabla ) <- parens $ undefined  --Big job here
-	trash <- many $ brackets undefined <|> newline --faux  
+	-- Eat until my position is good	
 	string "meth types="
 	typesMethods <- brackets $ parseTripletTypes `sepBy` comma 	 
 	emptyArea	
-	return $ (bigBlock, typesMethods)
+	return $ typesMethods
 
 parseTripletTypes :: Parser ([Maybe Integer], Maybe Integer, Maybe Integer)
 parseTripletTypes = do
@@ -367,18 +393,23 @@ nothingP :: Parser (Maybe Integer)
 	return Nothing
 
 --
---Formal parameters parser : use docs of BSV.
+-- Formal parameters method
+-- TODO
+
+
+
+--
+-- Formal parameters of instances, using doc pragmas.
 --
 
---apInstanceDocParser :: Parser [(String,[String])]
---apInstanceDocParser = lookAhead $
---	 do{many (try $ do{trash
---			; notFollowedBy (string "-- AP instance comments\n")
---			})
---	  ; trash
---	  ; trash   --We trash the lines until the parameters
---	  ; formalParametersParser}  
---
+apInstanceDocParser :: Parser [(String,[String])]
+apInstanceDocParser = lookAhead $
+	 do{many (try $ do{anyChar;
+			; notFollowedBy (string "-- AP instance comments\n")
+			})
+	; string "-- AP instance comments\n"  
+	; formalParametersParser}  
+
 
 formalParametersParser :: Parser [(String,[String])]
 formalParametersParser = many $ formalParameterParser
@@ -389,9 +420,6 @@ formalParameterParser = do
 	string ":\n"
 	parameters <- many $ identifier <* wSpace 
 	emptyArea
-	return Instance{instName = name
-		; moduleName = undefined 
-		; fpArgs = parameters}
+	return $ (name, parameters)
 
---
  
