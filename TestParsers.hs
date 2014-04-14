@@ -133,7 +133,7 @@ guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';'])
 
 -- 
 -- Parser of bindings 
--- Pass first tests
+--
 
 
 bindingParser :: Parser Binding 
@@ -312,15 +312,14 @@ formalParametersParser = many $ formalParameterParser
 
 formalParameterParser :: Parser Instance
 formalParameterParser = do
-	name <- identifier
-	string ":\n"
-	parameters <- many $ identifier <* wSpace 
+	name <- emptyArea *>identifier <* string ":"
 	emptyArea
+	par <- parens $ (many $ emptyArea *> identifier <* emptyArea)  
 	return Instance{instName = name
-		, moduleName = undefined 
-		, args = parameters}
+		, moduleName = "test" --Not implemented yet 
+		, args = par}
 
-
+--
 -- Tools
 --
 
