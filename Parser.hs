@@ -1,7 +1,6 @@
 module Parser where
 
 import Control.Monad
-import Control.Exception (assert)
 import Control.Applicative hiding ((<|>), many)
 import Data.Char
 import Data.List
@@ -17,9 +16,7 @@ import qualified Text.ParserCombinators.Parsec.Token as P
 
 --AST of ATS
 
-data Expression =
---	| Litt String   
-	| And String String
+data Expression = And String String
 	| Or String String
 	| Not String
 	| Mux String String String
@@ -29,14 +26,14 @@ data Expression =
 	| Concat [String] --Concat wires
 	| Plus String String
 	| Minus String String
-
+	deriving(Show)
 data Module = Module { name :: String
 	, instances :: [ Instance ]
 	, bindings :: [ Binding ]
 	, rules :: [ Rule ]
 	, methods :: [ Method ]
 	, fps :: [ Fp ]
-	, conflictMatrix :: Map (String, String) Conflict 
+	, conflictMatrix :: Map.Map (String, String) Conflict 
 	, priorityList :: [ [ String ] ]
 } 
 
@@ -45,17 +42,17 @@ data Conflict =  C | CF | SB | SA
 data Instance = Instance {instName :: String
 	, moduleName :: String
 	, args :: [ String ]
-}
+} --Done at home
 
 data Binding = Binding {bindName :: String
 	, size :: Integer 
 	, expression :: Expression
-}
+} deriving(Show)--Done
 
 data Rule = Rule {ruleName :: String
 	, ruleGuard :: String 
 	, ruleBody :: [ MExpression ]
-}
+} --Done
 
 
 data Method = Method {methodName :: String
@@ -63,7 +60,7 @@ data Method = Method {methodName :: String
 	, methodType :: TypeOfMethod  
 	, methodArgs :: [(String, Integer)]
 	, methodBody :: [ MExpression ]
-}
+} --Done
 
 data Fp = Fp {fpName :: String
 	, fpType :: TypeOfMethod
@@ -72,18 +69,17 @@ data Fp = Fp {fpName :: String
 
 -- Unit operations in the body of a method.
 data MExpression = MExpression {cond :: Maybe String 
-	, moduleName :: String
+	, moduleCalledName :: String
 	, calledMethod :: String 
-	, args :: [ String ]
-}
+	, argsMethod :: [ String ]
+} deriving(Show)--Done 
 
 
 --The integers are the size of the result
 data TypeOfMethod = Value Integer  
 	| Value0 Integer
 	| Action
-	| ActionValue Integer 
-
+	| ActionValue Integer
 --
 --Lexer and Parsers of the ATS language 
 --
@@ -95,17 +91,17 @@ defn = P.LanguageDef {
   P.commentEnd = "*/",
   P.commentLine = "--",
   P.nestedComments = False,
-  P.opStart = undefined,
+  P.opStart =  undefined,
   P.opLetter = undefined,
   P.reservedOpNames = undefined,
   P.identStart      = letter,
   P.identLetter     = alphaNum <|> char '_',
   P.reservedNames   = [ 
-                      , "rule"
                       ],
   P.caseSensitive   = True
 }
 
+operator   = choice $ map string ["++","||","&&","+","-"]  --Operators supported 
 whiteSpace = P.whiteSpace lexer  --comments are judged as whitespaces
 brackets   = P.brackets lexer
 braces     = P.braces lexer
@@ -118,9 +114,12 @@ reserved   = P.reserved lexer
 reservedOp = P.reservedOp lexer
 parens     = P.parens lexer
 wSpace     = many $ char ' ' <|> char '\t'
-emptyArea  = many $ wSpace <|> char '\n'
+emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 
-trash = undefined 
+
+guardParser = emptyArea *> (many $ noneOf ['\n',' ','\t',';'])    
+
+
 
 
 
@@ -143,13 +142,11 @@ instanceParser = do
 
 --
 -- Parser for Module
--- TODO
+-- 
 
-
-
---
---Parsers for bindings
---
+-- 
+-- Parser of bindings 
+-- Pass first tests
 
 
 bindingParser :: Parser Binding 
@@ -167,28 +164,33 @@ bindingParser = do
 	string " ="
 	expression <- expressionParser	
 	return $ Binding{bindName = name
-			; size = numberValue 10 size 
-			; expression = expression}
+			, size = numberValue 10 size 
+			, expression = expression}
 
 expressionParser :: Parser Expression
-expressionParser = ((try binaryParser) <|> (try listParser) <|> (try unaryParser)) <* string ";\n" 
+expressionParser = ( choice [try listParser, try binaryParser, try unaryParser]) <* string ";" 
 
 listParser :: Parser Expression
 listParser = do
-	list <- (emptyArea *> guardParser <* emptyArea)  `sepBy` string "++" 
-	return $ Concat list
+	--Dirty hack. TODO sepBy2 
+	first <- emptyArea *> guardParser  <* emptyArea 
+	string "++"    
+	list  <- (emptyArea *> guardParser <* emptyArea)  `sepBy1` string "++" 
+	return $ Concat $ first:list
 
 binaryParser :: Parser Expression 
 binaryParser = do
 	name1 <- (emptyArea *> guardParser <* emptyArea)	
-	op <- operator
+	op <-  operator
 	name2 <- (emptyArea *> guardParser <* emptyArea)					
-	return $ k op name1 name2
-	where 	k op name1 name2 = (lookup op l) name1 name2
-		l = [("&&", \x y -> And x y );
-		("||", \x y -> Or x y );
-		("+", \x y -> Plus x y );
-		("-", \x y -> Minus x y )]
+	return $  k op name1 name2
+	where 	k op name1 name2 = case (lookup op l) of
+					Just a -> a name1 name2
+					Nothing -> undefined --Fraction of BSV
+		l = [("&&", \x y -> And x y ),
+			("||", \x y -> Or x y ),
+			("+", \x y -> Plus x y ),
+			("-", \x y -> Minus x y )]
 
 unaryParser :: Parser Expression   
 unaryParser =
@@ -200,7 +202,7 @@ unaryParser =
               , k "extract" $ undefined  
               , k "!" $ undefined ]
   where
-    k x p = (emptyArea >* string x) *> p
+    k x p = (emptyArea *> string x) *> p
 
 
 --
@@ -229,11 +231,11 @@ ruleParser = do
 -- Parser of arguments / guards and whatever 
 -- 
 
-guardParser = emptyArea *> (many $ noneOf ['\n';' ';'\t'])    
+guardParser = emptyArea *> (many $ noneOf ['\n',' ','\t',';'])    
 		
 -- Parser for bodies of methods/rules
 
-ifMethodCallParser =do
+ifMethodCallParser = do
 	emptyArea *> string "if" <* emptyArea 
 	nameCond  <- guardParser 
 	emptyArea *> string "then"
@@ -266,7 +268,7 @@ methodParser = do
 			[(_,b)] -> case args of
 				[] -> Value0 b 
 				_  -> Value b
-			_ -> assert False --Correct?	  
+			_ -> undefined --Correct?	  
 
 
 --
@@ -327,7 +329,7 @@ methodBodyParser = do
 
 --	
 -- Parsers for instances with formal parameters
---
+-- Some job done at home
 
 bodyInstanceParser :: Parser (String, String) 
 bodyInstanceParser = do
@@ -394,4 +396,12 @@ formalParameterParser = do
 		; fpArgs = parameters}
 
 --
- 
+--
+-- Tools
+--
+
+numberValue :: Integer -> String ->  Integer
+numberValue n [a] = toInteger . digitToInt $ a 
+numberValue n (t:q) =n*(numberValue n q) + (toInteger . digitToInt $  t)
+
+
