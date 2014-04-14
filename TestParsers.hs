@@ -303,6 +303,23 @@ methodBodyParser = do
 	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = t, moduleCalledName = x, calledMethod = y, argsMethod = z})	
 
 
+--
+--Formal parameters parser : use docs of BSV.
+-- /!\ Need merge with home version.
+
+formalParametersParser :: Parser [Instance]
+formalParametersParser = many $ formalParameterParser
+
+formalParameterParser :: Parser Instance
+formalParameterParser = do
+	name <- identifier
+	string ":\n"
+	parameters <- many $ identifier <* wSpace 
+	emptyArea
+	return Instance{instName = name
+		, moduleName = undefined 
+		, args = parameters}
+
 
 -- Tools
 --
