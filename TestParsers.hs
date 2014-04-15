@@ -6,6 +6,7 @@ import Control.Applicative hiding ((<|>), many)
 import Data.Char
 import Data.List
 import qualified Data.Map as Map
+import qualified Data.String.Utils as S
 
 import Debug.Trace
 import Text.Parsec hiding (token)
@@ -130,6 +131,47 @@ emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 --
 
 guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';'])    
+
+---
+--- Parser of instances
+---
+
+
+
+instancesParser :: Parser [Instance]
+instancesParser = do
+	listInstances <- many $ instanceParser
+	let (onlyFpInstances,_) = partition (\x -> S.endswith "_fp" (moduleName x)) listInstances
+	listFp <- apInstanceDocParser
+	return $ process listInstances onlyFpInstances		
+	  where 
+		process (t:q) (r:s) =(t{args = args r} :(process q s))
+		process [] [] = []
+
+ 
+instanceParser :: Parser Instance
+instanceParser = do
+	toTrash <-many $ anyChar <* notFollowedBy (identifier <* string " :: ABSTRACT")
+	nameInst <- identifier
+	emptyArea *> string ":: ABSTRACT:" <* emptyArea
+	notImportant <- guardParser        --Well, not important but we store, never know
+	emptyArea *> string "=" <* emptyArea 
+	nameModule <- identifier <* emptyArea
+	return $ Instance {instName = nameInst 
+			, moduleName = nameModule 
+			, args = undefined }
+
+
+apInstanceDocParser :: Parser [Instance]
+apInstanceDocParser = lookAhead $
+	 do{many (try $ do{anyChar;
+			; notFollowedBy (string "-- AP instance comments\n")
+			})
+	; string "-- AP instance comments\n"  
+	; formalParametersParser}  
+
+
+
 
 -- 
 -- Parser of bindings 
