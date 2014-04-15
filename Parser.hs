@@ -422,4 +422,3 @@ formalParameterParser = do
 	emptyArea
 	return $ (name, parameters)
 
- 
