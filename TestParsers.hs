@@ -4,7 +4,8 @@ import Control.Monad
 import Control.Exception (assert)
 import Control.Applicative hiding ((<|>), many)
 import Data.Char
-import Data.List
+import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import qualified Data.Map as Map
 import qualified Data.String.Utils as S
 
@@ -132,22 +133,33 @@ emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 
 guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':'])   
 
+
+
 ---
---- Parser of instances
+---Grab all the bindings
+--- We need to grab all the bindings
+
+
+---
+--- Parser for instances
 ---
 
 
-
-instancesParser :: Parser [Instance]
+instancesParser :: Parser ([Either Instance ([Fp], [[String]], Map.Map (String,String) Conflict)])
 instancesParser = do
-	listInstances <- many $ try instanceParser
-	let (onlyFpInstances,noFp) = partition (\x -> S.endswith "_fp" (moduleName x)) listInstances
+	--Either FP, either instance
+	listInstances <- lookAhead . many $ try bodyInstanceParser <|> try instanceParser
 	listFp <- apInstanceDocParser
-	return $ (process onlyFpInstances listFp) ++ noFp  		
+	return $ process listInstances listFp  		
 	  where process [] [] = []
-		process (t:q) (r:s) =(t{args = args r} :(process q s))
+		process (t:q) [] = case t of
+					Left a -> (Left a):(process q [])
+					Right (a,b) -> Right(a,[],b):(process q []) ---Should not happen  
+		process (t:q) (r:s) = case t of 
+					Left a -> if instName a == instName r then (Left(a{args=args r})):(process q s)  else (Left a):(process q (r:s))
+					Right (a,b) ->if instName r == "fp" then (Right(a, [], b)):(process q s) else undefined --We need priority list TODO
  
-instanceParser :: Parser Instance
+instanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 instanceParser = do
 	toTrash <- manyTill
 					 anyChar 
@@ -162,7 +174,7 @@ instanceParser = do
 	string "="
 	emptyArea 
 	nameModule <- guardParser 
-	return $ Instance {instName = nameInst 
+        return $ Left Instance {instName = nameInst 
 			, moduleName = nameModule 
 			, args = [] }
 
@@ -174,9 +186,8 @@ apInstanceDocParser = lookAhead $
 
 
 
-
 -- 
--- Parser of bindings 
+-- Parser for bindings 
 --
 
 
@@ -292,7 +303,7 @@ data ResultOrArg = Result | Arg deriving(Show,Eq)
 methodParser :: Parser Method
 methodParser = do
 	listArgs <- many $  (try resultParser) <|> argMethodParser
-	let (lResult, lArgs) = partition (\(x,y,z) -> x == Result) listArgs  --TODO : check the partition function  
+	let (lResult, lArgs) = List.partition (\(x,y,z) -> x == Result) listArgs  --TODO : check the partition function  
 	method <- brackets $ methodBodyParser 
 	return method{methodArgs = process1 lArgs, methodType = process2 lArgs lResult}
 	  where	process1 = map (\(x,y,z) ->(y,z)) 
@@ -301,7 +312,7 @@ methodParser = do
 			[(_,_,b)] -> case args of
 				[] -> Value0 b 
 				_  -> Value b
-			_ -> undefined --TODO Correct?	  
+			_ -> undefined --TODO Correct?  ActionValue	  
 
 
 
@@ -347,9 +358,90 @@ methodBodyParser = do
 	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = t, moduleCalledName = x, calledMethod = y, argsMethod = z})	
 
 
+
+
+--
+-- Parser for fp with FPs, BVI. 
+-- /!\ TODO cleanup 
+
+
+bodyInstanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
+bodyInstanceParser = do
+	toTrash <- manyTill anyChar ((try . lookAhead $ do{test<- guardParser <* emptyArea
+						; string ":: ABSTRACT"
+						; return test}))
+	emptyArea *> string "fp :: ABSTRACT:"
+	emptyArea 
+	notImportant <- guardParser
+	emptyArea        --Well, not important but we store, never know
+	string "="
+	emptyArea 
+	nameModule <- guardParser 
+	-- Eat until my position is good	
+	manyTill anyChar $ (try . lookAhead $ (string "[method"))
+	methNames <- brackets $ parserMethName `sepBy` char ','
+	
+	-- TODO : Stuff for scheduling.
+	manyTill anyChar $ (try $ emptyArea *> string "SchedInfo" <* emptyArea )
+	scheduleInfos <- brackets $ parserSchedule `sepBy` char ','
+	let mapScheduling = foldl (\map (x,y,z) -> Map.insert (x,y) z map) Map.empty scheduleInfos   
+
+	
+	manyTill anyChar $ try (string "meth types=")
+	typesMethods <- brackets $ parseTripletTypes `sepBy` comma 	 
+	emptyArea	
+	let finalList = process typesMethods methNames
+   	
+	return $ Right (finalList, mapScheduling)
+	where 	process l1 l2 = f $ List.zip l1 l2
+	      	f [] = []	      
+		f (((lArgsT,trigger,result),(mName,lArg)):q) = Fp{fpName = mName --TODO we forgot the trigger here.
+				, fpType = sayMeMyType lArgsT result
+				, fpArgs = zip lArg (Maybe.catMaybes $ lArgsT) }:(f q)
+		sayMeMyType args res = case res of              --TODO : hardly defined before ... factorization
+					Nothing -> Action  
+					Just b  -> case args of
+						[] -> Value0 b 
+						_  -> Value b  --TODO : need a hack for actions value
+
+
+parserMethName :: Parser (String,[String])
+parserMethName = undefined
+
+parserSchedule :: Parser (String, String, Conflict)
+parserSchedule = undefined 
+
+parseTripletTypes :: Parser ([Maybe Integer], Maybe Integer, Maybe Integer)
+parseTripletTypes = do
+	first <- brackets $ maybeParser `sepBy` comma 
+	comma 
+	second <- maybeParser
+	comma
+	third <- maybeParser	
+	return (first, second, third)
+
+
+maybeParser :: Parser (Maybe Integer)
+maybeParser = (try justP)<|>nothingP 
+
+justP :: Parser (Maybe Integer)
+justP = do
+	wSpace
+	string "Just "
+	listOfChar <- parens $ (string "Bit " *> (many $ digit))
+	return $ Just (numberValue 10 listOfChar) -- Decimal notation
+
+
+
+nothingP :: Parser (Maybe Integer)
+nothingP = do
+	wSpace *> string "Nothing" <* wSpace --TODO : check
+	return Nothing
+
+
 --
 --Formal parameters parser : use docs of BSV.
--- /!\ Need merge with home version.
+--
 
 formalParametersParser :: Parser [Instance]
 formalParametersParser = many $ try formalParameterParser
