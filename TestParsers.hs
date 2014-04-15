@@ -131,7 +131,7 @@ emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 -- TODO : Maybe we can always replace [identifier] by [guardParser]
 --
 
-guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':'])   
+guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',','])   
 
 
 
@@ -381,7 +381,6 @@ bodyInstanceParser = do
 	manyTill anyChar $ (try . lookAhead $ (string "[method"))
 	methNames <- brackets $ parserMethName `sepBy` char ','
 	
-	-- TODO : Stuff for scheduling.
 	manyTill anyChar $ (try $ emptyArea *> string "SchedInfo" <* emptyArea )
 	scheduleInfos <- brackets $ parserSchedule `sepBy` char ','
 	let mapScheduling = foldl (\map (x,y,z) -> Map.insert (x,y) z map) Map.empty scheduleInfos   
@@ -404,12 +403,47 @@ bodyInstanceParser = do
 						[] -> Value0 b 
 						_  -> Value b  --TODO : need a hack for actions value
 
+--method (cpuToHost, [])cpuToHost enable ((EN_cpuToHost,
+--									   [])) clocked_by (default_clock) reset_by (default_reset);,
 
 parserMethName :: Parser (String,[String])
-parserMethName = undefined
+parserMethName = do
+	string "method" <* emptyArea
+	option "" . parens . try . many $ noneOf [')']
+	nameMeth <- guardParser <* emptyArea 
+	args <- option [] . parens $ (try . parens $ do{name<-guardParser <* emptyArea 
+					; comma
+					; brackets . many $ noneOf [']']
+					; return name}) `sepBy` string ","  
 
+
+	--Throw it away!
+	emptyArea *> string "clocked_by" <* emptyArea 
+	option "" . parens . try . many $ noneOf [')']
+	emptyArea *> string "reset_by" <* emptyArea
+	option "" . parens . try . many $ noneOf [')']
+ 	emptyArea *> string ";" <* emptyArea 
+	return (nameMeth, args)	 	    
+	
+
+
+-- In a first time, we simplify the syntax for scheduling
 parserSchedule :: Parser (String, String, Conflict)
-parserSchedule = undefined 
+parserSchedule = do
+	r1 <- emptyArea *> guardParser  
+	op <- emptyArea *> guardParser <* emptyArea
+	r2 <- guardParser <* emptyArea
+	return $ (r1, r2, process op )
+	where 	process op = case lookup op l of
+				Just a -> a
+				Nothing -> undefined --Should not happen, ATS provided by BSC compiler
+		l = [("C", C ),
+			("CF", CF ),
+			("SB", SB ),
+			("SA", SA )]
+
+
+
 
 parseTripletTypes :: Parser ([Maybe Integer], Maybe Integer, Maybe Integer)
 parseTripletTypes = do
@@ -450,9 +484,9 @@ formalParameterParser :: Parser Instance
 formalParameterParser = do
 	name <- emptyArea *>identifier <* string ":"
 	trace name $ emptyArea
-	par <- parens $ (many $ emptyArea *> identifier <* emptyArea)  
+	par <- parens $ (many $ emptyArea *> ((try.parens.many $ noneOf [')']) <|> identifier) <* emptyArea)  
 	return Instance{instName = name
-		, moduleName = "test" --Not implemented yet 
+ 		, moduleName = "hack" --I don't remember why I thought it was smart to return Instance ... 
 		, args = par}
 
 --
