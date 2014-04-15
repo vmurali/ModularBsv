@@ -130,7 +130,7 @@ emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 -- TODO : Maybe we can always replace [identifier] by [guardParser]
 --
 
-guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';'])    
+guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':'])   
 
 ---
 --- Parser of instances
@@ -140,34 +140,36 @@ guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';'])
 
 instancesParser :: Parser [Instance]
 instancesParser = do
-	listInstances <- many $ instanceParser
-	let (onlyFpInstances,_) = partition (\x -> S.endswith "_fp" (moduleName x)) listInstances
+	listInstances <- many $ try instanceParser
+	let (onlyFpInstances,noFp) = partition (\x -> S.endswith "_fp" (moduleName x)) listInstances
 	listFp <- apInstanceDocParser
-	return $ process listInstances onlyFpInstances		
-	  where 
+	return $ (process onlyFpInstances listFp) ++ noFp  		
+	  where process [] [] = []
 		process (t:q) (r:s) =(t{args = args r} :(process q s))
-		process [] [] = []
-
  
 instanceParser :: Parser Instance
 instanceParser = do
-	toTrash <-many $ anyChar <* notFollowedBy (identifier <* string " :: ABSTRACT")
-	nameInst <- identifier
-	emptyArea *> string ":: ABSTRACT:" <* emptyArea
-	notImportant <- guardParser        --Well, not important but we store, never know
-	emptyArea *> string "=" <* emptyArea 
-	nameModule <- identifier <* emptyArea
+	toTrash <- manyTill
+					 anyChar 
+					((try . lookAhead $ do{test<- guardParser <* emptyArea
+						; string ":: ABSTRACT"
+						; return test}))
+	nameInst <- emptyArea *> guardParser
+	emptyArea *> string ":: ABSTRACT:"
+	emptyArea 
+	notImportant <- guardParser
+	emptyArea        --Well, not important but we store, never know
+	string "="
+	emptyArea 
+	nameModule <- guardParser 
 	return $ Instance {instName = nameInst 
 			, moduleName = nameModule 
-			, args = undefined }
+			, args = [] }
 
 
 apInstanceDocParser :: Parser [Instance]
 apInstanceDocParser = lookAhead $
-	 do{many (try $ do{anyChar;
-			; notFollowedBy (string "-- AP instance comments\n")
-			})
-	; string "-- AP instance comments\n"  
+	 do{manyTill anyChar $ (try $ string "-- AP instance comments\n")			
 	; formalParametersParser}  
 
 
@@ -350,12 +352,12 @@ methodBodyParser = do
 -- /!\ Need merge with home version.
 
 formalParametersParser :: Parser [Instance]
-formalParametersParser = many $ formalParameterParser
+formalParametersParser = many $ try formalParameterParser
 
 formalParameterParser :: Parser Instance
 formalParameterParser = do
 	name <- emptyArea *>identifier <* string ":"
-	emptyArea
+	trace name $ emptyArea
 	par <- parens $ (many $ emptyArea *> identifier <* emptyArea)  
 	return Instance{instName = name
 		, moduleName = "test" --Not implemented yet 
