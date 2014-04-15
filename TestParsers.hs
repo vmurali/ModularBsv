@@ -379,7 +379,8 @@ bodyInstanceParser = do
 	nameModule <- guardParser 
 	-- Eat until my position is good	
 	manyTill anyChar $ (try . lookAhead $ (string "[method"))
-	methNames <- brackets $ parserMethName `sepBy` char ','
+	char '['
+	methNames <- parserMethName `sepBy` char ','
 	
 	manyTill anyChar $ (try $ emptyArea *> string "SchedInfo" <* emptyArea )
 	scheduleInfos <- brackets $ parserSchedule `sepBy` char ','
@@ -403,21 +404,22 @@ bodyInstanceParser = do
 						[] -> Value0 b 
 						_  -> Value b  --TODO : need a hack for actions value
 
---method (cpuToHost, [])cpuToHost enable ((EN_cpuToHost,
---									   [])) clocked_by (default_clock) reset_by (default_reset);,
+-- method (cpuToHost, [])cpuToHost enable ((EN_cpuToHost,
+-- [])) clocked_by (default_clock) reset_by (default_reset);,
 
 parserMethName :: Parser (String,[String])
 parserMethName = do
-	string "method" <* emptyArea
+	trace "what" $emptyArea *> string "method" <* emptyArea
 	option "" . parens . try . many $ noneOf [')']
 	nameMeth <- guardParser <* emptyArea 
 	args <- option [] . parens $ (try . parens $ do{name<-guardParser <* emptyArea 
 					; comma
 					; brackets . many $ noneOf [']']
 					; return name}) `sepBy` string ","  
-
-
 	--Throw it away!
+	
+	trace "fdsf" $ option "" $ emptyArea *> string "enable" <* emptyArea 
+	option "" . parens . try . many $ noneOf [')']
 	emptyArea *> string "clocked_by" <* emptyArea 
 	option "" . parens . try . many $ noneOf [')']
 	emptyArea *> string "reset_by" <* emptyArea
