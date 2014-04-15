@@ -1,11 +1,13 @@
-module Parser where
+module TestParsers where
 
 import Control.Monad
+import Control.Exception (assert)
 import Control.Applicative hiding ((<|>), many)
 import Data.Char
 import Data.List
-import qualified Data.String as S
+import qualified Data.Map as Map
 
+import Debug.Trace
 import Text.Parsec hiding (token)
 import Text.Parsec.String
 
@@ -27,7 +29,8 @@ data Expression = And String String
 	| Concat [String] --Concat wires
 	| Plus String String
 	| Minus String String
-	deriving(Show)
+	deriving(Show,Eq)
+
 data Module = Module { name :: String
 	, instances :: [ Instance ]
 	, bindings :: [ Binding ]
@@ -36,24 +39,24 @@ data Module = Module { name :: String
 	, fps :: [ Fp ]
 	, conflictMatrix :: Map.Map (String, String) Conflict 
 	, priorityList :: [ [ String ] ]
-} 
+} deriving(Show,Eq)--Done
 
-data Conflict =  C | CF | SB | SA
+data Conflict =  C | CF | SB | SA deriving(Show,Eq)
 
 data Instance = Instance {instName :: String
 	, moduleName :: String
 	, args :: [ String ]
-} --Done at home
+} deriving(Show,Eq)--Done
 
 data Binding = Binding {bindName :: String
 	, size :: Integer 
 	, expression :: Expression
-} deriving(Show)--Done
+} deriving(Show,Eq)--Done
 
 data Rule = Rule {ruleName :: String
 	, ruleGuard :: String 
 	, ruleBody :: [ MExpression ]
-} --Done
+} deriving(Show,Eq)--Done
 
 
 data Method = Method {methodName :: String
@@ -61,19 +64,19 @@ data Method = Method {methodName :: String
 	, methodType :: TypeOfMethod  
 	, methodArgs :: [(String, Integer)]
 	, methodBody :: [ MExpression ]
-} --Done
+} deriving(Show,Eq) --Done
 
 data Fp = Fp {fpName :: String
 	, fpType :: TypeOfMethod
 	, fpArgs :: [ (String,Integer) ]
-}
+} deriving(Show,Eq)
 
 -- Unit operations in the body of a method.
 data MExpression = MExpression {cond :: Maybe String 
 	, moduleCalledName :: String
 	, calledMethod :: String 
 	, argsMethod :: [ String ]
-} deriving(Show)--Done 
+} deriving(Show,Eq)--Done 
 
 
 --The integers are the size of the result
@@ -81,6 +84,7 @@ data TypeOfMethod = Value Integer
 	| Value0 Integer
 	| Action
 	| ActionValue Integer
+	deriving(Show,Eq)
 --
 --Lexer and Parsers of the ATS language 
 --
@@ -117,63 +121,20 @@ parens     = P.parens lexer
 wSpace     = many $ char ' ' <|> char '\t'
 emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 
-
-guardParser = emptyArea *> (many $ noneOf ['\n',' ','\t',';'])    
-
-
-
-
-
-nameParser :: Parser String
-nameParser = do
-	string "APackage"
-	wSpace
-	name <- identifier
-	wSpace
-	return $ name  		  
-
 --
--- Parser for Module
--- TODO
-
+-- Parser of arguments / guards. 
+-- It's a more general Parser than the identifier
+-- e.g "8d'5464" is parsed  by guardParser.
+-- 
+-- TODO : Maybe we can always replace [identifier] by [guardParser]
 --
--- Parser for instance
+
+guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';'])    
+
+-- 
+-- Parser of bindings 
 --
--- Instances: 
--- [{
---    instName: proc
---    moduleName: mkProc
---    args : [names] // doc for instance (keyword :AP inst 
--- We check the formal parameters with _fp at the end of the module name
 
-
-instancesParser :: Parser [Instance]
-instancesParser = do
-	listInstances <- many $ instanceParser
-	listFp <- apInstanceDocParser
-	return $ process listInstances listFp		
-	  where (onlyFpInstances,_) = partition (\x -> S.endswith "_fp" (moduleName x)) listInstances
-		process (t:q) ((_,r):s) =(t{args=r} :(process q s))
-		process [] [] = []
-
- 
-instanceParser :: Parser Instance
-instanceParser = do
-	toTrash <-many $ anyChar <* notFollowedBy (identifier <* string " :: ABSTRACT")
-	nameInst <- identifier
-	emptyArea *> string ":: ABSTRACT:" <* emptyArea
-	notImportant <- guardParser        --Well, not important but we store, never know
-	emptyArea *> string "=" <* emptyArea 
-	nameModule <- identifier <* emptyArea
-	return $ Instance {instName = nameInst 
-			; moduleName = nameModule 
-			; args = undefined }
-
-
- 
---
---Parsers for bindings
---
 
 bindingParser :: Parser Binding 
 bindingParser = do
@@ -231,6 +192,7 @@ unaryParser =
     k x p = (emptyArea *> string x) *> p
 
 
+
 --
 -- Parsers for rules 
 -- Typical format :
@@ -240,24 +202,19 @@ unaryParser =
 
 ruleParser :: Parser Rule 
 ruleParser = do
-	string "rule"
-	processedName <- wSpace *> identifier <* wSpace  
-	realName <- char '"' *> identifier  <* char '"' <* char ":" 			
+	emptyArea *> string "rule"
+	processedName <- wSpace *> identifier <* wSpace
+	realName <- string "\"" *> identifier  <* string "\":" 			
 	guard <- emptyArea *> string "when" *> guardParser <* emptyArea 
 	string "==>"
-	wSpace
+	emptyArea
  	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> methodCallParser) 	 		
 	return $ Rule{ruleName = processedName 
-			; ruleGuard = guard
-			; ruleBody = toMExpr listExpr}
-	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = x; moduleName = t; calledMethod = y; argsM = z})	
+			, ruleGuard = guard
+			, ruleBody = toMExpr listExpr}
+	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = t, moduleCalledName = x, calledMethod = y, argsMethod = z})	
 
 
---
--- Parser of arguments / guards and whatever 
--- 
-
-guardParser = emptyArea *> (many $ noneOf ['\n',' ','\t',';'])    
 		
 -- Parser for bodies of methods/rules
 
@@ -268,7 +225,7 @@ ifMethodCallParser = do
 	(cond,moduleName,methodName,args) <- methodCallParser
 	return $ (Just nameCond, moduleName, methodName, args)    	
 
-methodCallParser = 
+methodCallParser = do 
 	moduleName <- emptyArea *> identifier <* char '.'	
 	methodName <- identifier <* emptyArea 
         args <- many $ guardParser <* emptyArea 
@@ -281,27 +238,28 @@ methodCallParser =
 --
 -- Parsers for methods
 --
+--
+-- /!\			 /!\
+-- /!\TODO: Need clean up/!\
+-- /!\			 /!\
+
+data ResultOrArg = Result | Arg deriving(Show,Eq)
 
 methodParser :: Parser Method
 methodParser = do
-	listArgs <- many $  (try resultParser) <|> argsMethodParser  	
+	listArgs <- many $  (try resultParser) <|> argMethodParser
+	let (lResult, lArgs) = partition (\(x,y,z) -> x == Result) listArgs  --TODO : check the partition function  
 	method <- brackets $ methodBodyParser 
-	return method{methodArgs = process1 lArgs; methodType = process2 lArgs lResult}
-	  where (lResult, lArgs) = partition (\(x,y,z) -> x == Result) listArgs --Check the order of partition
-		process1 = map (\(x,y,z) ->(y,z)) 
+	return method{methodArgs = process1 lArgs, methodType = process2 lArgs lResult}
+	  where	process1 = map (\(x,y,z) ->(y,z)) 
 		process2 args res = case res of
 			[] -> Action  
-			[(_,b)] -> case args of
+			[(_,_,b)] -> case args of
 				[] -> Value0 b 
 				_  -> Value b
-			_ -> undefined --Correct?	  
+			_ -> undefined --TODO Correct?	  
 
 
---
---TODO Need clean up
---
-
-data ResultOrArg = Result | Arg
 
 argMethodParser :: Parser (ResultOrArg,String,Integer)
 argMethodParser = do
@@ -315,18 +273,13 @@ argMethodParser = do
 	return (Arg, name, numberValue 10 size)
 		
 resultParser :: Parser (ResultOrArg,String,Integer)
-resultParser = do wSpace
-	--We parse the first line
-	name <- identifier 
+resultParser = do
 	wSpace
-	string ":: Bit "
-	size <- many digit 		
-	wSpace
+	name <- emptyArea *> identifier  <* emptyArea <* string ":: Bit "
+	size <- many digit <* emptyArea
 	char ';'
-	emptyArea
---We parse the second line with the same name
-	string name
-	string " ="
+	--Second line : assignment
+	emptyArea *> string name <*string " ="
 	expression <- expressionParser	
 	return $ (Result, name, numberValue 10 size)
 		
@@ -336,98 +289,36 @@ methodBodyParser :: Parser Method
 methodBodyParser = do
 	string "rule"
 	processedName <- wSpace *> identifier <* wSpace  
-	realName <- char '"' *> identifier  <* char '"' <* char ":" 			
+	realName <- string "\"" *> identifier  <* string "\":" 			
 	notImportant <- emptyArea *> string "when" *> guardParser <* emptyArea 
 	string "==>"
 	wSpace
  	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> methodCallParser) 	 		
+	trash <- many $ noneOf [']']    --We have to eat all the useless stuff, until the ] appears. 
 	return $ Method{methodName = processedName 
-			; methodGuard = "RDY_" ++ processedName  --TODO check if we need bindings
-			; methodType = undefined
-			; methodArgs = undefined
-			; methodBody = toMExpr listExpr}
-	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = x; moduleName = t; calledMethod = y; argsM = z})	
-
-
-
+			, methodGuard = "RDY_" ++ processedName  --TODO check if we need bindings
+			, methodType = undefined
+			, methodArgs = undefined
+			, methodBody = toMExpr listExpr}
+	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = t, moduleCalledName = x, calledMethod = y, argsMethod = z})	
 
 
 --
--- Parser for conflicts
--- TODO
+--Formal parameters parser : use docs of BSV.
+-- /!\ Need merge with home version.
 
-
---	
--- Parsers for instances with formal parameters
--- Some job done at home
-
-bodyInstanceParser :: Parser [([Maybe Integer], Maybe Integer, Maybe Integer)]
-bodyInstanceParser = do
-	-- Eat until my position is good	
-	string "meth types="
-	typesMethods <- brackets $ parseTripletTypes `sepBy` comma 	 
-	emptyArea	
-	return $ typesMethods
-
-parseTripletTypes :: Parser ([Maybe Integer], Maybe Integer, Maybe Integer)
-parseTripletTypes = do
-	first <- brackets $ maybeParser `sepBy` comma 
-	comma 
-	second <- maybeParser
-	comma
-	third <- maybeParser	
-	return (first, second, third)
-
-
-maybeParser :: Parser (Maybe Integer)
-maybeParser = (try justP)<|>nothingP 
-
-justP :: Parser (Maybe Integer)
-justP = do
-	wSpace
-	string "Just "
-	listOfChar <- (many $ digit ) . string "Bit " $ paren
-	return $ Just (numberValue 10 listOfChar) -- Decimal notation
-
-
-
-nothingP :: Parser (Maybe Integer)
-nothingP :: Parser (Maybe Integer)
-	wSpace *> string "Nothing" <* wSpace --TODO : check
-	return Nothing
-
---
--- Formal parameters method
--- TODO
-
-
-
---
--- Formal parameters of instances, using doc pragmas.
---
---
-
-apInstanceDocParser :: Parser [(String,[String])]
-apInstanceDocParser = lookAhead $
-	 do{many (try $ do{anyChar;
-			; notFollowedBy (string "-- AP instance comments\n")
-			})
-	; string "-- AP instance comments\n"  
-	; formalParametersParser}  
-
-
-formalParametersParser :: Parser [(String,[String])]
+formalParametersParser :: Parser [Instance]
 formalParametersParser = many $ formalParameterParser
 
-formalParameterParser :: Parser (String,[String])
+formalParameterParser :: Parser Instance
 formalParameterParser = do
-	name <- identifier
-	string ":\n"
-	parameters <- many $ identifier <* wSpace 
+	name <- emptyArea *>identifier <* string ":"
 	emptyArea
-	return $ (name, parameters)
+	par <- parens $ (many $ emptyArea *> identifier <* emptyArea)  
+	return Instance{instName = name
+		, moduleName = "test" --Not implemented yet 
+		, args = par}
 
---
 --
 -- Tools
 --
@@ -435,4 +326,7 @@ formalParameterParser = do
 numberValue :: Integer -> String ->  Integer
 numberValue n [a] = toInteger . digitToInt $ a 
 numberValue n (t:q) =n*(numberValue n q) + (toInteger . digitToInt $  t)
+
+
+
 
