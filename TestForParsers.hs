@@ -3,13 +3,13 @@
 -- No work to raise exceptions, no defensive programming.
 
 --GOOD
-parseTest bindingParser "a : Bit 6 ;\n a = b ++c ;"
-parseTest bindingParser "a : Bit 6 ;\n a = b && c;"
-parseTest bindingParser "a : Bit 6 ;\n a = b ++ c ++ d;"
-parseTest bindingParser "a : Bit 6 ;\n a = b ++ 8'd554;"
-parseTest bindingParser "a : Bit 6 ;\n a = b || c;"
-parseTest bindingParser "a : Bit 6 ;\n a = b && c;"
-parseTest bindingParser "a : Bit 6 ;\n a =_if_ a b c;"
+parseTest bindingParser "a :: Bit 6 ;\n a = b ++c ;"
+parseTest bindingParser "a :: Bit 6 ;\n a = b && c;"
+parseTest bindingParser "a :: Bit 6 ;\n a = b ++ c ++ d;"
+parseTest bindingParser "a :: Bit 6 ;\n a = b ++ 8'd554;"
+parseTest bindingParser "a :: Bit 6 ;\n a = b || c;"
+parseTest bindingParser "a :: Bit 6 ;\n a = b && c;"
+parseTest bindingParser "a :: Bit 6 ;\n a =_if_ a b c;"
 
 
 

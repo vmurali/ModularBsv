@@ -12,7 +12,8 @@ APackage mkIMemory
 clock { osc = CLK }
 reset { RST_N }
 -- APackage wire info
-clock info  clock default_clock(CLK, {-unused-});
+
+´clock info  clock default_clock(CLK, {-unused-});
 reset info  reset default_reset(RST_N) clocked_by(default_clock);
 arg info  [clockarg default_clock;, resetarg default_reset;]
 -- APackage clock domains

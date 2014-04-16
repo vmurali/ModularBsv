@@ -109,7 +109,7 @@ defn = P.LanguageDef {
   P.caseSensitive   = True
 }
 
-operator   = choice $ map string ["++","||","&&","+","-"]  --Operators supported 
+--operator   = choice $ map string ["++","||","&&","+","-"]  --Operators supported 
 whiteSpace = P.whiteSpace lexer  --comments are judged as whitespaces
 brackets   = P.brackets lexer
 braces     = P.braces lexer
@@ -132,33 +132,34 @@ emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 -- TODO : Maybe we can always replace [identifier] by [guardParser]
 --
 
-guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',','])   
+guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',',','='])   
 
 
 
 ---
----Grab all the bindings
---- We need to grab all the bindings
---data Module = Module { name :: String
---	, instances :: [ Instance ]
---	, bindings :: [ Binding ]
---	, rules :: [ Rule ]
---	, methods :: [ Method ]
---	, fps :: [ Fp ]
---	, conflictMatrix :: Map.Map (String, String) Conflict 
---	, priorityList :: [ [ String ] ]
---}
+--- Main Parser : Parser for modules.
+---
+
+
+modulesParser :: Parser [Module]
+modulesParser = do
+	many . try $ do{manyTill anyChar (try $ string"=== ATS:");moduleParser}
+	
 
 
 moduleParser :: Parser Module
 moduleParser = do
-	listInstancesAndFormalParameters <- instancesParser
-	listBindings <- many . try $ do{manyTill anyChar (lookAhead.try $ bindingParser);bindingParser}
+	manyTill anyChar (try $ string "APackage") <* emptyArea
+	nameModule <- identifier <*emptyArea
+	listInstancesAndFormalParameters <-  instancesParser
+	manyTill anyChar . try $ string "-- AP local definitions"	
+	listBindings <- lookAhead . many . try $ do{manyTill anyChar (lookAhead.try $ bindingParser);bindingParser}
+	manyTill anyChar . try $ string "-- AP rules"	
 	listRules<-many . try $ ruleParser
 	manyTill anyChar . try $ string "-- AP scheduling pragmas"	
 	listMethods <- many . try $ do{manyTill anyChar (try . lookAhead $ methodParser); methodParser}
 	let (inst,l) = E.partitionEithers listInstancesAndFormalParameters 
-	return $ Module{name="foo"  --Test name
+	return $ Module{name=nameModule  --Test name
 			, instances = inst
 			, bindings = listBindings
 			, rules = listRules
@@ -235,15 +236,15 @@ bindingParser = do
 	char ';'
 	emptyArea
 --We parse the second line with the same name
-	string name
-	string " ="
+	string name <* emptyArea
+	string "="
 	expression <- expressionParser	
 	return $ Binding{bindName = name
 			, size = numberValue 10 size 
 			, expression = expression}
 
 expressionParser :: Parser Expression
-expressionParser = ( choice [try listParser, try binaryParser, try unaryParser]) <* string ";" 
+expressionParser = (try listParser <|> try binaryParser <|> try unaryParser) <* string ";" 
 
 listParser :: Parser Expression
 listParser = do
@@ -256,13 +257,14 @@ listParser = do
 binaryParser :: Parser Expression 
 binaryParser = do
 	name1 <- (emptyArea *> guardParser <* emptyArea)	
-	op <-  operator
+	op <-  guardParser --I can use operator parser
 	name2 <- (emptyArea *> guardParser <* emptyArea)					
 	return $  k op name1 name2
 	where 	k op name1 name2 = case (lookup op l) of
 					Just a -> a name1 name2
 					Nothing -> undefined --Fraction of BSV
-		l = [("&&", \x y -> And x y ),
+		l = [("=", \x y -> Equal x y),   --Set of supported operators
+			("&&", \x y -> And x y ),
 			("||", \x y -> Or x y ),
 			("+", \x y -> Plus x y ),
 			("-", \x y -> Minus x y )]
@@ -295,7 +297,7 @@ ruleParser = do
 	guard <- emptyArea *> string "when" *> guardParser <* emptyArea 
 	string "==>"
 	emptyArea
- 	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> methodCallParser) 	 		
+ 	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> (try methodCallParser)) 	 		
 	return $ Rule{ruleName = processedName 
 			, ruleGuard = guard
 			, ruleBody = toMExpr listExpr}
@@ -314,7 +316,7 @@ ifMethodCallParser = do
 
 methodCallParser = do 
 	moduleName <- emptyArea *> identifier <* char '.'	
-	methodName <- identifier <* emptyArea 
+	methodName <- guardParser <* emptyArea 
         args <- many $ guardParser <* emptyArea 
 	char ';'
 	emptyArea
