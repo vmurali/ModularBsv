@@ -8,6 +8,7 @@ import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import qualified Data.Map as Map
 import qualified Data.String.Utils as S
+import qualified Data.Either as E
 
 import Debug.Trace
 import Text.Parsec hiding (token)
@@ -148,6 +149,25 @@ guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',','])
 --	, priorityList :: [ [ String ] ]
 --}
 
+
+moduleParser :: Parser Module
+moduleParser = do
+	listInstancesAndFormalParameters <- instancesParser
+	listBindings <- many . try $ do{manyTill anyChar (lookAhead.try $ bindingParser);bindingParser}
+	listRules<-many . try $ ruleParser
+	manyTill anyChar . try $ string "-- AP scheduling pragmas"	
+	listMethods <- many . try $ do{manyTill anyChar (try . lookAhead $ methodParser); methodParser}
+	let (inst,l) = E.partitionEithers listInstancesAndFormalParameters 
+	return $ Module{name="foo"  --Test name
+			, instances = inst
+			, bindings = listBindings
+			, rules = listRules
+			, methods = listMethods
+			, fps = if null l then []  else (\(x,y,z)->x).head $ l
+			, conflictMatrix = if null l then Map.empty else (\(x,y,z)->z).head $ l
+			, priorityList = if null l then [] else (\(x,y,z)->y).head $ l} 
+
+
 ---
 --- Parser for instances
 ---
@@ -157,9 +177,9 @@ instancesParser :: Parser ([Either Instance ([Fp], [[String]], Map.Map (String,S
 instancesParser = do
 	--Either FP, either instance
 	listInstances <-lookAhead . many $ (try bodyInstanceParser) <|> (try instanceParser)
-	listFp <- trace "Jesuisla" $ apInstanceDocParser
+	listFp <- apInstanceDocParser
 	let (listWithoutFp,singleFp) = List.partition (\x -> instName x == "fp") listFp
-	return $ trace "fuck" ( process listInstances listWithoutFp singleFp)
+	return $ process listInstances listWithoutFp singleFp
 	  where process [] [] fp = []
 		process (t:q) [] fp = case t of
 					Left a -> (Left a):(process q [] fp)
@@ -269,7 +289,7 @@ unaryParser =
 
 ruleParser :: Parser Rule 
 ruleParser = do
-	emptyArea *> string "rule"
+	manyTill anyChar . try $ string "rule"
 	processedName <- wSpace *> identifier <* wSpace
 	realName <- string "\"" *> identifier  <* string "\":" 			
 	guard <- emptyArea *> string "when" *> guardParser <* emptyArea 
@@ -314,7 +334,7 @@ data ResultOrArg = Result | Arg deriving(Show,Eq)
 
 methodParser :: Parser Method
 methodParser = do
-	listArgs <- many $  (try resultParser) <|> argMethodParser
+	listArgs <- many $  (try resultParser) <|> try argMethodParser
 	let (lResult, lArgs) = List.partition (\(x,y,z) -> x == Result) listArgs  --TODO : check the partition function  
 	method <- brackets $ methodBodyParser 
 	return method{methodArgs = process1 lArgs, methodType = process2 lArgs lResult}
@@ -322,7 +342,7 @@ methodParser = do
 		process2 args res = case res of
 			[] -> Action  
 			[(_,_,b)] -> case args of
-				[] -> Value0 b 
+				[] -> Value0 b
 				_  -> Value b
 			_ -> undefined --TODO Correct?  ActionValue	  
 
@@ -380,7 +400,7 @@ methodBodyParser = do
 
 bodyInstanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 bodyInstanceParser = do
-	toTrash <- trace "poney" $ manyTill anyChar ((try . lookAhead $ do{test<- guardParser <* emptyArea
+	toTrash <-  manyTill anyChar ((try . lookAhead $ do{test<- guardParser <* emptyArea
 						; string ":: ABSTRACT"
 						; return test}))
 	emptyArea *> string "fp :: ABSTRACT:"
@@ -389,23 +409,23 @@ bodyInstanceParser = do
 	emptyArea        --Well, not important but we store, never know
 	string "="
 	emptyArea 
-	nameModule <- trace "elephant" $ guardParser 
+	nameModule <-  guardParser 
 	-- Eat until my position is good	
 	manyTill anyChar $ (try . lookAhead $ (string "[method"))
 	char '['
-	methNames <- trace "drosophile" $ (try parserMethName) `sepBy`  (emptyArea *> comma <* emptyArea )
+	methNames <- (try parserMethName) `sepBy`  (emptyArea *> comma <* emptyArea )
 
 	manyTill anyChar $ (try $ emptyArea *> string "SchedInfo" <* emptyArea )
-	scheduleInfos <- trace "langouste ".brackets $ (try parserSchedule) `sepBy` (emptyArea *> comma <* emptyArea )
+	scheduleInfos <- brackets $ (try parserSchedule) `sepBy` (emptyArea *> comma <* emptyArea )
 	let mapScheduling = foldl (\map (x,y,z) -> Map.insert (x,y) z map) Map.empty $ concat scheduleInfos   
 
 	
-        trace "mouai " . manyTill anyChar $ try (string "meth types=")
-	typesMethods <- trace "poulet".brackets $ (try.parens $ parseTripletTypes) `sepBy` comma 
-	trace "souris" $ emptyArea	
+        manyTill anyChar $ try (string "meth types=")
+	typesMethods <- brackets $ (try.parens $ parseTripletTypes) `sepBy` comma 
+	emptyArea	
 	let finalList = process typesMethods methNames
    		
-	return $ (trace "humhum" $ Right (finalList, mapScheduling))
+	return $ (Right (finalList, mapScheduling))
 	where 	process l1 l2 = f $ List.zip l1 l2
 	      	f [] = []	      
 		f (((lArgsT,trigger,result),(mName,lArg)):q) = Fp{fpName = mName --TODO we forgot the trigger here.
@@ -512,7 +532,7 @@ formalParametersParser = many $ try formalParameterParser
 formalParameterParser :: Parser Instance
 formalParameterParser = do
 	name <- emptyArea *>identifier <* string ":"
-	trace name $ emptyArea
+	emptyArea
 	par <- parens $ (many $ emptyArea *> ((try.parens.many $ noneOf [')']) <|> identifier) <* emptyArea)  
 	return Instance{instName = name
  		, moduleName = "hack" --I don't remember why I thought it was smart to return Instance ... 
