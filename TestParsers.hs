@@ -132,7 +132,7 @@ emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 -- TODO : Maybe we can always replace [identifier] by [guardParser]
 --
 
-guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',',','='])   
+guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',',','=']) <* emptyArea   
 
 
 
@@ -149,8 +149,8 @@ modulesParser = do
 
 moduleParser :: Parser Module
 moduleParser = do
-	manyTill anyChar (try $ string "APackage") <* emptyArea
-	nameModule <- identifier <*emptyArea
+	manyTill anyChar (try $ string "APackage") 
+	nameModule <- guardParser 
 	listInstancesAndFormalParameters <-  instancesParser
 	manyTill anyChar . try $ string "-- AP local definitions"	
 	listBindings <- lookAhead . many . try $ do{manyTill anyChar (lookAhead.try $ bindingParser);bindingParser}
@@ -177,14 +177,14 @@ moduleParser = do
 instancesParser :: Parser ([Either Instance ([Fp], [[String]], Map.Map (String,String) Conflict)])
 instancesParser = do
 	--Either FP, either instance
-	listInstances <-lookAhead . many $ (try bodyInstanceParser) <|> (try instanceParser)
+	listInstances <- lookAhead . many $ (try bodyInstanceParser) <|> (try instanceParser)
 	listFp <- apInstanceDocParser
-	let (listWithoutFp,singleFp) = List.partition (\x -> instName x == "fp") listFp
+	let (listWithoutFp,singleFp) = List.partition (\x -> instName x /= "fp") listFp
 	return $ process listInstances listWithoutFp singleFp
 	  where process [] [] fp = []
 		process (t:q) [] fp = case t of
 					Left a -> (Left a):(process q [] fp)
-					Right (a,b) -> Right(a,[],b):(process q [] fp)	---Should not happen  
+					Right (a,b) ->(Right(a, map words . args . head $ fp, b)):(process q [] fp)
 		process (t:q) (r:s) fp = case t of 
 					Left a      -> if instName a == instName r then
 							(Left(a{args=args r})):(process q s fp)
@@ -195,18 +195,14 @@ instancesParser = do
 
 instanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 instanceParser = do
-	toTrash <- manyTill
-					 anyChar 
-					((try . lookAhead $ do{test<- guardParser <* emptyArea
+	toTrash <- manyTill anyChar ((try . lookAhead $ do{test<- guardParser
 						; string ":: ABSTRACT"
 						; return test}))
-	nameInst <- emptyArea *> guardParser
-	emptyArea *> string ":: ABSTRACT:"
-	emptyArea 
+	nameInst <- guardParser
+	string ":: ABSTRACT:"
 	notImportant <- guardParser
-	emptyArea        --Well, not important but we store, never know
-	string "="
-	emptyArea 
+	--Well, not important but we store, never know
+	string "=" 
 	nameModule <- guardParser 
         return $ Left Instance {instName = nameInst 
 			, moduleName = nameModule 
@@ -224,7 +220,7 @@ apInstanceDocParser = lookAhead $
 -- Parser for bindings 
 --
 
-
+--Need checking
 bindingParser :: Parser Binding 
 bindingParser = do
 --We parse the first line
@@ -249,21 +245,21 @@ expressionParser = (try listParser <|> try binaryParser <|> try unaryParser) <* 
 listParser :: Parser Expression
 listParser = do
 	--Dirty hack. TODO sepBy2 
-	first <- emptyArea *> guardParser  <* emptyArea 
+	first <- guardParser
 	string "++"    
-	list  <- (emptyArea *> guardParser <* emptyArea)  `sepBy1` string "++" 
+	list  <- guardParser `sepBy1` string "++" 
 	return $ Concat $ first:list
 
 binaryParser :: Parser Expression 
 binaryParser = do
-	name1 <- (emptyArea *> guardParser <* emptyArea)	
+	name1 <- guardParser
 	op <-  guardParser --I can use operator parser
-	name2 <- (emptyArea *> guardParser <* emptyArea)					
+	name2 <- guardParser	
 	return $  k op name1 name2
 	where 	k op name1 name2 = case (lookup op l) of
 					Just a -> a name1 name2
 					Nothing -> undefined --Fraction of BSV
-		l = [("=", \x y -> Equal x y),   --Set of supported operators
+		l = [("==", \x y -> Equal x y),   --Set of supported operators
 			("&&", \x y -> And x y ),
 			("||", \x y -> Or x y ),
 			("+", \x y -> Plus x y ),
@@ -271,10 +267,9 @@ binaryParser = do
 
 unaryParser :: Parser Expression   
 unaryParser =
-	choice [ k "_if_" $ do{first <- emptyArea *> guardParser
-				; second <- emptyArea *> guardParser
-				; third <- emptyArea *> guardParser
-				; emptyArea
+	choice [ k "_if_" $ do{first <- guardParser
+				; second <- guardParser
+				; third <- guardParser
 				; return $ Mux first second third }
               , k "extract" $ undefined  
               , k "!" $ undefined ]
@@ -292,11 +287,10 @@ unaryParser =
 ruleParser :: Parser Rule 
 ruleParser = do
 	manyTill anyChar . try $ string "rule"
-	processedName <- wSpace *> identifier <* wSpace
-	realName <- string "\"" *> identifier  <* string "\":" 			
-	guard <- emptyArea *> string "when" *> guardParser <* emptyArea 
-	string "==>"
-	emptyArea
+	processedName <- guardParser         --TESTING TODO
+	realName <- string "\"" *> identifier <* string "\":"	
+	guard <- emptyArea *> string "when" *> guardParser 
+	string "==>" <* emptyArea
  	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> (try methodCallParser)) 	 		
 	return $ Rule{ruleName = processedName 
 			, ruleGuard = guard
@@ -308,20 +302,17 @@ ruleParser = do
 -- Parser for bodies of methods/rules
 
 ifMethodCallParser = do
-	emptyArea *> string "if" <* emptyArea 
-	nameCond  <- guardParser 
-	emptyArea *> string "then"
+	emptyArea *> string "if" 
+	nameCond  <- guardParser <* string "then" <* emptyArea
 	(cond,moduleName,methodName,args) <- methodCallParser
 	return $ (Just nameCond, moduleName, methodName, args)    	
 
 methodCallParser = do 
-	moduleName <- emptyArea *> identifier <* char '.'	
-	methodName <- guardParser <* emptyArea 
-        args <- many $ guardParser <* emptyArea 
-	char ';'
-	emptyArea
+	moduleName <- identifier <* char '.'   --TESTING TODO	
+	methodName <- guardParser
+        args <- many $ guardParser
+	char ';' <* emptyArea
 	return $ (Nothing, moduleName, methodName, args)
-
 
 
 --
@@ -337,10 +328,10 @@ data ResultOrArg = Result | Arg deriving(Show,Eq)
 methodParser :: Parser Method
 methodParser = do
 	listArgs <- many $  (try resultParser) <|> try argMethodParser
-	let (lResult, lArgs) = List.partition (\(x,y,z) -> x == Result) listArgs  --TODO : check the partition function  
+	let (lResult, lArgs) = List.partition (\(x,y,z) -> x == Result) listArgs  --TODO : check partition  
 	method <- brackets $ methodBodyParser 
 	return method{methodArgs = process1 lArgs, methodType = process2 lArgs lResult}
-	  where	process1 = map (\(x,y,z) ->(y,z)) 
+	  where	process1 = map (\(x,y,z)->(y,z)) 
 		process2 args res = case res of
 			[] -> Action  
 			[(_,_,b)] -> case args of
@@ -349,26 +340,22 @@ methodParser = do
 			_ -> undefined --TODO Correct?  ActionValue	  
 
 
-
+--TODO prettyfication
 argMethodParser :: Parser (ResultOrArg,String,Integer)
 argMethodParser = do
 	name <- identifier 
-	wSpace
-	string ":: Bit "
+	emptyArea *> string ":: Bit "
 	size <- many digit 		
-	wSpace
-	char ';'
-	emptyArea
+	emptyArea *> char ';' <* emptyArea
 	return (Arg, name, numberValue 10 size)
 		
 resultParser :: Parser (ResultOrArg,String,Integer)
 resultParser = do
 	wSpace
-	name <- emptyArea *> identifier  <* emptyArea <* string ":: Bit "
-	size <- many digit <* emptyArea
-	char ';'
+	name <- guardParser <* string ":: Bit "  --TODO testing
+	size <- many digit <* emptyArea <* char ';'
 	--Second line : assignment
-	emptyArea *> string name <*string " ="
+	emptyArea *> string name <* string " ="
 	expression <- expressionParser	
 	return $ (Result, name, numberValue 10 size)
 		
@@ -377,11 +364,10 @@ resultParser = do
 methodBodyParser :: Parser Method 
 methodBodyParser = do
 	string "rule"
-	processedName <- wSpace *> identifier <* wSpace  
+	processedName <- guardParser  --Rely on Whitespace TODO check if I can erase the "  
 	realName <- string "\"" *> identifier  <* string "\":" 			
-	notImportant <- emptyArea *> string "when" *> guardParser <* emptyArea 
-	string "==>"
-	wSpace
+	notImportant <- emptyArea *> string "when" *> guardParser  
+	string "==>" <* emptyArea
  	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> methodCallParser) 	 		
 	trash <- many $ noneOf [']']    --We have to eat all the useless stuff, until the ] appears. 
 	return $ Method{methodName = processedName 
@@ -397,7 +383,7 @@ methodBodyParser = do
 --
 -- Parser for fp with FPs, BVI. 
 -- /!\ TODO cleanup
--- TODO : SCHEDULO INFOS BETTER 
+-- TODO : Priority INFOS BETTER 
 
 
 bodyInstanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
@@ -406,25 +392,20 @@ bodyInstanceParser = do
 						; string ":: ABSTRACT"
 						; return test}))
 	emptyArea *> string "fp :: ABSTRACT:"
-	emptyArea 
 	notImportant <- guardParser
-	emptyArea        --Well, not important but we store, never know
 	string "="
-	emptyArea 
 	nameModule <-  guardParser 
 	-- Eat until my position is good	
 	manyTill anyChar $ (try . lookAhead $ (string "[method"))
 	char '['
-	methNames <- (try parserMethName) `sepBy`  (emptyArea *> comma <* emptyArea )
-
-	manyTill anyChar $ (try $ emptyArea *> string "SchedInfo" <* emptyArea )
-	scheduleInfos <- brackets $ (try parserSchedule) `sepBy` (emptyArea *> comma <* emptyArea )
+	methNames <- (try parserMethName) `sepBy` (emptyArea *> comma <* emptyArea)  --TODO Testing
+	(manyTill anyChar $ (try $ string "SchedInfo")) <* emptyArea    --EMPTY AREA NEEDED
+	scheduleInfos <- brackets $ (try parserSchedule) `sepBy` (emptyArea *> comma <* emptyArea) --TODO Testing
 	let mapScheduling = foldl (\map (x,y,z) -> Map.insert (x,y) z map) Map.empty $ concat scheduleInfos   
 
 	
         manyTill anyChar $ try (string "meth types=")
-	typesMethods <- brackets $ (try.parens $ parseTripletTypes) `sepBy` comma 
-	emptyArea	
+	typesMethods <- brackets $ (try.parens $ parseTripletTypes) `sepBy` (emptyArea *> comma <* emptyArea ) 
 	let finalList = process typesMethods methNames
    		
 	return $ (Right (finalList, mapScheduling))
@@ -445,9 +426,9 @@ bodyInstanceParser = do
 parserMethName :: Parser (String,[String])
 parserMethName = do
 	emptyArea *> string "method" <* emptyArea
-	option "" . parens . try . many $ noneOf [')']
-	nameMeth <- guardParser <* emptyArea 
-	args <- option [] . parens $ (try . parens $ do{name<-guardParser <* emptyArea 
+	option "" . parens . try . many $ noneOf [')']   --TODO Check if it"s correct
+	nameMeth <- guardParser 
+	args <- option [] . parens $ (try . parens $ do{name<-guardParser 
 					; comma <* emptyArea 
 					; brackets . many $ noneOf [']']
 					; return name}) `sepBy` (emptyArea *> string "," <* emptyArea )  
@@ -493,7 +474,7 @@ parserSchedule = do
 
 parseTripletTypes :: Parser ([Integer], Maybe Integer, Maybe Integer)
 parseTripletTypes = do
-	first <- brackets $ (try bitParser) `sepBy` comma --BUG HERE, BE AWAKE THOMAS!
+	first <- brackets $ (try bitParser) `sepBy` comma 
 	comma 
 	second <- maybeParser
 	comma
@@ -511,7 +492,7 @@ maybeParser = (try justP)<|>nothingP
 
 justP :: Parser (Maybe Integer)
 justP = do
-	wSpace
+	emptyArea
 	string "Just "
 	listOfChar <- parens $ (string "Bit " *> (many $ digit))
 	return $ Just (numberValue 10 listOfChar) -- Decimal notation
@@ -520,7 +501,7 @@ justP = do
 
 nothingP :: Parser (Maybe Integer)
 nothingP = do
-	wSpace *> string "Nothing" <* wSpace --TODO : check
+	emptyArea *> string "Nothing" <* emptyArea --TODO : check
 	return Nothing
 
 
