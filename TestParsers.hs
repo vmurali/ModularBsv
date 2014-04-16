@@ -13,6 +13,7 @@ import qualified Data.Either as E
 import Debug.Trace
 import Text.Parsec hiding (token)
 import Text.Parsec.String
+import Text.Parsec.Prim
 
 import qualified Text.ParserCombinators.Parsec.Token as P
 
@@ -47,13 +48,13 @@ data Module = Module { name :: String
 data Conflict =  C | CF | SB | SA deriving(Show,Eq)
 
 data Instance = Instance {instName :: String
-	, moduleName :: String
-	, args :: [ String ]
+	, instModule :: String
+	, instArgs :: [ String ]
 } deriving(Show,Eq)--Done
 
 data Binding = Binding {bindName :: String
-	, size :: Integer 
-	, expression :: Expression
+	, bindSize :: Integer 
+	, bindExpr :: Expression
 } deriving(Show,Eq)--Done
 
 data Rule = Rule {ruleName :: String
@@ -75,10 +76,10 @@ data Fp = Fp {fpName :: String
 } deriving(Show,Eq)
 
 -- Unit operations in the body of a method.
-data MExpression = MExpression {cond :: Maybe String 
-	, moduleCalledName :: String
+data MExpression = MExpression {calledCond :: Maybe String 
+	, calledModule :: String
 	, calledMethod :: String 
-	, argsMethod :: [ String ]
+	, calledArgs :: [ String ]
 } deriving(Show,Eq)--Done 
 
 
@@ -121,7 +122,6 @@ lexeme     = P.lexeme lexer
 reserved   = P.reserved lexer    
 reservedOp = P.reservedOp lexer
 parens     = P.parens lexer
-wSpace     = many $ char ' ' <|> char '\t'
 emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 
 --
@@ -143,20 +143,20 @@ guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',',','=
 
 modulesParser :: Parser [Module]
 modulesParser = do
-	many . try $ do{manyTill anyChar (try $ string"=== ATS:");moduleParser}
+	many . try $ do{manyTill anyChar (try $ reserved "=== ATS:");moduleParser}
 	
 
 
 moduleParser :: Parser Module
 moduleParser = do
-	manyTill anyChar (try $ string "APackage") 
+	manyTill anyChar (try $ reserved "APackage") 
 	nameModule <- guardParser 
 	listInstancesAndFormalParameters <-  instancesParser
-	manyTill anyChar . try $ string "-- AP local definitions"	
+	manyTill anyChar . try $ reserved "-- AP local definitions"	
 	listBindings <- lookAhead . many . try $ do{manyTill anyChar (lookAhead.try $ bindingParser);bindingParser}
-	manyTill anyChar . try $ string "-- AP rules"	
+	manyTill anyChar . try $ reserved "-- AP rules"	
 	listRules<-many . try $ ruleParser
-	manyTill anyChar . try $ string "-- AP scheduling pragmas"	
+	manyTill anyChar . try $ reserved "-- AP scheduling pragmas"	
 	listMethods <- many . try $ do{manyTill anyChar (try . lookAhead $ methodParser); methodParser}
 	let (inst,l) = E.partitionEithers listInstancesAndFormalParameters 
 	return $ Module{name=nameModule  --Test name
@@ -184,12 +184,12 @@ instancesParser = do
 	  where process [] [] fp = []
 		process (t:q) [] fp = case t of
 					Left a -> (Left a):(process q [] fp)
-					Right (a,b) ->(Right(a, map words . args . head $ fp, b)):(process q [] fp)
+					Right (a,b) ->(Right(a, map words . instArgs . head $ fp, b)):(process q [] fp)
 		process (t:q) (r:s) fp = case t of 
 					Left a      -> if instName a == instName r then
-							(Left(a{args=args r})):(process q s fp)
+							(Left(a{instArgs=instArgs r})):(process q s fp)
 							else (Left a):(process q (r:s) fp)
-					Right (a,b) ->(Right(a, map words . args . head $ fp, b)):(process q s fp)
+					Right (a,b) ->(Right(a, map words . instArgs . head $ fp, b)):(process q s fp)
 					--If hd fails it's that there is no priority list in the sourcecode	
 
 
@@ -205,8 +205,8 @@ instanceParser = do
 	string "=" 
 	nameModule <- guardParser 
         return $ Left Instance {instName = nameInst 
-			, moduleName = nameModule 
-			, args = [] }
+			, instModule = nameModule 
+			, instArgs = [] }
 
 
 apInstanceDocParser :: Parser [Instance]
@@ -225,10 +225,10 @@ bindingParser :: Parser Binding
 bindingParser = do
 --We parse the first line
 	name <- identifier 
-	wSpace
+	emptyArea
 	string ":: Bit "
 	size <- many digit 		
-	wSpace
+	emptyArea
 	char ';'
 	emptyArea
 --We parse the second line with the same name
@@ -236,8 +236,8 @@ bindingParser = do
 	string "="
 	expression <- expressionParser	
 	return $ Binding{bindName = name
-			, size = numberValue 10 size 
-			, expression = expression}
+			, bindSize = numberValue 10 size 
+			, bindExpr = expression}
 
 expressionParser :: Parser Expression
 expressionParser = (try listParser <|> try binaryParser <|> try unaryParser) <* string ";" 
@@ -295,7 +295,7 @@ ruleParser = do
 	return $ Rule{ruleName = processedName 
 			, ruleGuard = guard
 			, ruleBody = toMExpr listExpr}
-	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = t, moduleCalledName = x, calledMethod = y, argsMethod = z})	
+	where toMExpr = map (\(t,x,y,z) -> MExpression{calledCond = t, calledModule = x, calledMethod = y, calledArgs = z})	
 
 
 		
@@ -351,7 +351,7 @@ argMethodParser = do
 		
 resultParser :: Parser (ResultOrArg,String,Integer)
 resultParser = do
-	wSpace
+	emptyArea
 	name <- guardParser <* string ":: Bit "  --TODO testing
 	size <- many digit <* emptyArea <* char ';'
 	--Second line : assignment
@@ -375,7 +375,7 @@ methodBodyParser = do
 			, methodType = undefined
 			, methodArgs = undefined
 			, methodBody = toMExpr listExpr}
-	where toMExpr = map (\(t,x,y,z) -> MExpression{cond = t, moduleCalledName = x, calledMethod = y, argsMethod = z})	
+	where toMExpr = map (\(t,x,y,z) -> MExpression{calledCond = t, calledModule = x, calledMethod = y, calledArgs = z})	
 
 
 
@@ -518,8 +518,8 @@ formalParameterParser = do
 	emptyArea
 	par <- parens $ (many $ emptyArea *> ((try.parens.many $ noneOf [')']) <|> identifier) <* emptyArea)  
 	return Instance{instName = name
- 		, moduleName = "hack" --I don't remember why I thought it was smart to return Instance ... 
-		, args = par}
+ 		, instModule = "hack" --I don't remember why I thought it was smart to return Instance ... 
+		, instArgs = par}
 
 --
 -- Tools
