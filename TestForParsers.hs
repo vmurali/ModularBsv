@@ -25,7 +25,27 @@ parseTest methodParser "wr_idx :: Bit 7;\n wr_val :: Bit 32;\n [rule wr \"wr\":\
 
 
 parseTest formalParametersParser "fp: \n(fdsk fdsjkh rewjh)\n pasta: (fdskj fdslj)\n"
-parseTest formalParametersParser "fp:\n(fdsk fdsf fds )\n  fd:\n (fkdjsk ghr ghfd t4reh)"
+parseTest formalParametersParser "fp:\n(fdsk fdsf fds )\n  fd:\n \n (fkdjsk ghr ghfd t4r_eh)"
+
+--Without formal parameters
+parseTest instancesParser "mem :: ABSTRACT:  RegFile.VRegFile = RegFileLoad\n				     (VModInfo\n				      RegFileLoad\n				      clock _clk__1(CLK, {-unused-});\n				      [clockarg _clk__1;,\n				       param file;,\n				       param addr_width;,\n				       param data_width;,\n				       param lo;,\n				       param hi;,\n				       param binary;]\n				      [method upd((ADDR_IN, []), (D_IN, [reg])) enable ((WE,\n											 [])) clocked_by (_clk__1) reset_by (no_reset);,\n				       method (D_OUT, [])sub[5]((ADDR, [])) clocked_by (_clk__1) reset_by (no_reset);]\n				      SchedInfo [sub CF sub, sub SB upd, upd C upd] [] [] []\n				      [])\n				     [clock { osc:  CLK gate:  1'd1 },\n				      \"memory.vmh\",\n				      32'd26,\n				      32'd32,\n				      26'h0,\n				      26'd67108863,\n				      1'd0]\n				     []\n				     meth types=[([Bit 26, Bit 32], Just (Bit 1), Nothing),\n						 ([Bit 26], Nothing, Just (Bit 32))]\n				     port types=ADDR_1 -> Prelude.Bit 26\n						ADDR_2 -> Prelude.Bit 26\n						ADDR_3 -> Prelude.Bit 26\n						ADDR_4 -> Prelude.Bit 26\n						ADDR_5 -> Prelude.Bit 26\n						ADDR_IN -> Prelude.Bit 26\n						D_IN -> Prelude.Bit 32\n						D_OUT_1 -> Prelude.Bit 32\n						D_OUT_2 -> Prelude.Bit 32\n						D_OUT_3 -> Prelude.Bit 32\n						D_OUT_4 -> Prelude.Bit 32\n						D_OUT_5 -> Prelude.Bit 32\n-- AP local definitions\ni__h241 :: Bit 26;\ni__h241  = extract req_a 32'd27 32'd2;\n-- IdProp i__h241[IdP_keep]\n-- AP rules\n-- AP scheduling pragmas\n[]\n-- AP interface\n-- AP  apkg_interface def mkIMemory\n--AIDef req\nreq_a :: Bit 32;\nreq :: Bit 32;\nreq  = mem.sub i__h241;\npred:  RDY_req\nclock domain = Just (0), resets = []\nmethod (req, [])req((req_a, [])) clocked_by (default_clock) reset_by (no_reset);\n\n-- AP  apkg_interface def mkIMemory\n--AIDef RDY_req\nRDY_req :: Bit 1;\nRDY_req  = 1'd1;\n-- IdProp RDY_req[IdPReady]\npred:  1'b1\nclock domain = Just (0), resets = []\nmethod (RDY_req, [])RDY_req clocked_by (default_clock) reset_by (no_reset);\n\n-- AP instance comments\n-- AP remaining proof obligations\n[]\n\n"
+
+
+parseTest parserMethName "method (FSds, [])kkfd((gfkj, [])) clocked_by (_clk__) reset_by (_rst__);"
+parseTest ( parserMethName `sepBy` char',') "method (FSds, [])kkfd((gfkj, [])) clocked_by (_clk__) reset_by (_rst__);,\n      method gfsdkj((fdslk, []), (hgf, [])) enable ((fsder,\n     [])) clocked_by (_clk__) reset_by (_rst__);,\n      method (GDSfds, [])fsdkhj((gfd, [])) enable ((fdkdssj,\n    [])) clocked_by (_clk__) reset_by (_rst__);"
+
+parseTest parseTripletTypes "[ Bit 2 ], Just (Bit 1), Nothing"
+
+
+parseTest bodyInstanceParser "fp :: ABSTRACT:  Proc._Proc.Bla36 = mkProc_fp\n    (VModInfo\n     mkProc_fp\n     clock _clk__(CLK, CLK_GATE);\n     reset _rst__(RST) clocked_by(_clk__);\n     [resetarg _rst__;, clockarg _clk__;]\n     [method (FSds, [])kkfd((gfkj, [])) clocked_by (_clk__) reset_by (_rst__);,\n      method gfsdkj((fdslk, []), (hgf, [])) enable ((fsder,\n     [])) clocked_by (_clk__) reset_by (_rst__);,\n      method (GDSfds, [])fsdkhj((gfd, [])) enable ((fdkdssj,\n    [])) clocked_by (_clk__) reset_by (_rst__);]\n     SchedInfo\n     [fsdkhj CF gfsdkj,\n      kkfd CF fsdkhj,\n      kkfd SB gfsdkj,\n      fsdkhj C fsdkhj,\n      gfsdkj C gfsdkj]\n     []\n     []\n     []\n     [])\n    [reset { wire:  RST_N }, clock { osc:  CLK gate:  1'd1 }]\n    []\n    meth types=[([Bit 5], Nothing, Just (Bit 6)),\n([Bit 54, Bit 83], Just (Bit 1), Nothing),\n([Bit 6], Just (Bit 1), Just (Bit 1))]\n    port types=FSds -> Prelude.Bit 6\n       GDSfds -> Prelude.ActionValue (Prelude.Bit 1)\n       fdslk -> Prelude.Bit 54\n       gfd -> Prelude.Bit 6\n       gfkj -> Prelude.Bit 5\n       hgf -> Prelude.Bit 83\n\n"
+
+
+
+--With formal parameters
+
+
+
+
 
 
 --BAD : Weak, -> TODO

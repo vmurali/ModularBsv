@@ -388,7 +388,7 @@ bodyInstanceParser = do
 
 	
         manyTill anyChar $ try (string "meth types=")
-	typesMethods <- brackets $ (try parseTripletTypes) `sepBy` comma 
+	typesMethods <- trace "endive" $ brackets $ (try.parens $ parseTripletTypes) `sepBy` comma 
 	emptyArea	
 	let finalList = process typesMethods methNames
    		
@@ -397,7 +397,7 @@ bodyInstanceParser = do
 	      	f [] = []	      
 		f (((lArgsT,trigger,result),(mName,lArg)):q) = Fp{fpName = mName --TODO we forgot the trigger here.
 				, fpType = sayMeMyType lArgsT result
-				, fpArgs = zip lArg (Maybe.catMaybes $ lArgsT) }:(f q)
+				, fpArgs = zip lArg lArgsT }:(f q)
 		sayMeMyType args res = case res of              --TODO : hardly defined before ... factorization
 					Nothing -> Action  
 					Just b  -> case args of
@@ -447,15 +447,20 @@ parserSchedule = do
 
 
 
-parseTripletTypes :: Parser ([Maybe Integer], Maybe Integer, Maybe Integer)
+parseTripletTypes :: Parser ([Integer], Maybe Integer, Maybe Integer)
 parseTripletTypes = do
-	first <- brackets $ maybeParser `sepBy` comma 
+	first <- brackets $ (try bitParser) `sepBy` comma --BUG HERE, BE AWAKE THOMAS!
 	comma 
 	second <- maybeParser
 	comma
 	third <- maybeParser	
 	return (first, second, third)
 
+bitParser :: Parser Integer
+bitParser = do
+	emptyArea *> string "Bit" <* emptyArea
+	listOfChar <- many $ digit <* emptyArea
+	return $ numberValue 10 listOfChar  
 
 maybeParser :: Parser (Maybe Integer)
 maybeParser = (try justP)<|>nothingP 
