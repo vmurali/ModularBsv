@@ -380,18 +380,18 @@ bodyInstanceParser = do
 	-- Eat until my position is good	
 	manyTill anyChar $ (try . lookAhead $ (string "[method"))
 	char '['
-	methNames <- parserMethName `sepBy` char ','
-	
+	methNames <- (try parserMethName) `sepBy`  (emptyArea *> comma <* emptyArea )
+
 	manyTill anyChar $ (try $ emptyArea *> string "SchedInfo" <* emptyArea )
-	scheduleInfos <- brackets $ parserSchedule `sepBy` char ','
+	scheduleInfos <- brackets $ (try parserSchedule) `sepBy` (emptyArea *> comma <* emptyArea )
 	let mapScheduling = foldl (\map (x,y,z) -> Map.insert (x,y) z map) Map.empty scheduleInfos   
 
 	
-	manyTill anyChar $ try (string "meth types=")
-	typesMethods <- brackets $ parseTripletTypes `sepBy` comma 	 
+        manyTill anyChar $ try (string "meth types=")
+	typesMethods <- brackets $ (try parseTripletTypes) `sepBy` comma 
 	emptyArea	
 	let finalList = process typesMethods methNames
-   	
+   		
 	return $ Right (finalList, mapScheduling)
 	where 	process l1 l2 = f $ List.zip l1 l2
 	      	f [] = []	      
@@ -409,17 +409,17 @@ bodyInstanceParser = do
 
 parserMethName :: Parser (String,[String])
 parserMethName = do
-	trace "what" $emptyArea *> string "method" <* emptyArea
+	emptyArea *> string "method" <* emptyArea
 	option "" . parens . try . many $ noneOf [')']
 	nameMeth <- guardParser <* emptyArea 
 	args <- option [] . parens $ (try . parens $ do{name<-guardParser <* emptyArea 
-					; comma
+					; comma <* emptyArea 
 					; brackets . many $ noneOf [']']
-					; return name}) `sepBy` string ","  
+					; return name}) `sepBy` (emptyArea *> string "," <* emptyArea )  
 	--Throw it away!
 	
-	trace "fdsf" $ option "" $ emptyArea *> string "enable" <* emptyArea 
-	option "" . parens . try . many $ noneOf [')']
+	option "" $ emptyArea *> string "enable" <* emptyArea 
+	option "" . parens . parens . try . many $ noneOf [')']
 	emptyArea *> string "clocked_by" <* emptyArea 
 	option "" . parens . try . many $ noneOf [')']
 	emptyArea *> string "reset_by" <* emptyArea
@@ -432,9 +432,9 @@ parserMethName = do
 -- In a first time, we simplify the syntax for scheduling
 parserSchedule :: Parser (String, String, Conflict)
 parserSchedule = do
-	r1 <- emptyArea *> guardParser  
+	r1 <- emptyArea *> identifier  
 	op <- emptyArea *> guardParser <* emptyArea
-	r2 <- guardParser <* emptyArea
+	r2 <- identifier <* emptyArea
 	return $ (r1, r2, process op )
 	where 	process op = case lookup op l of
 				Just a -> a
