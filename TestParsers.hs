@@ -138,7 +138,15 @@ guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',','])
 ---
 ---Grab all the bindings
 --- We need to grab all the bindings
-
+--data Module = Module { name :: String
+--	, instances :: [ Instance ]
+--	, bindings :: [ Binding ]
+--	, rules :: [ Rule ]
+--	, methods :: [ Method ]
+--	, fps :: [ Fp ]
+--	, conflictMatrix :: Map.Map (String, String) Conflict 
+--	, priorityList :: [ [ String ] ]
+--}
 
 ---
 --- Parser for instances
@@ -148,17 +156,22 @@ guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',','])
 instancesParser :: Parser ([Either Instance ([Fp], [[String]], Map.Map (String,String) Conflict)])
 instancesParser = do
 	--Either FP, either instance
-	listInstances <- lookAhead . many $ try bodyInstanceParser <|> try instanceParser
-	listFp <- apInstanceDocParser
-	return $ process listInstances listFp  		
-	  where process [] [] = []
-		process (t:q) [] = case t of
-					Left a -> (Left a):(process q [])
-					Right (a,b) -> Right(a,[],b):(process q []) ---Should not happen  
-		process (t:q) (r:s) = case t of 
-					Left a -> if instName a == instName r then (Left(a{args=args r})):(process q s)  else (Left a):(process q (r:s))
-					Right (a,b) ->if instName r == "fp" then (Right(a, [], b)):(process q s) else undefined --We need priority list TODO
- 
+	listInstances <-lookAhead . many $ (try bodyInstanceParser) <|> (try instanceParser)
+	listFp <- trace "Jesuisla" $ apInstanceDocParser
+	let (listWithoutFp,singleFp) = List.partition (\x -> instName x == "fp") listFp
+	return $ trace "fuck" ( process listInstances listWithoutFp singleFp)
+	  where process [] [] fp = []
+		process (t:q) [] fp = case t of
+					Left a -> (Left a):(process q [] fp)
+					Right (a,b) -> Right(a,[],b):(process q [] fp)	---Should not happen  
+		process (t:q) (r:s) fp = case t of 
+					Left a      -> if instName a == instName r then
+							(Left(a{args=args r})):(process q s fp)
+							else (Left a):(process q (r:s) fp)
+					Right (a,b) ->(Right(a, map words . args . head $ fp, b)):(process q s fp)
+					--If hd fails it's that there is no priority list in the sourcecode	
+
+
 instanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 instanceParser = do
 	toTrash <- manyTill
@@ -245,7 +258,6 @@ unaryParser =
               , k "!" $ undefined ]
   where
     k x p = (emptyArea *> string x) *> p
-
 
 
 --
@@ -362,12 +374,13 @@ methodBodyParser = do
 
 --
 -- Parser for fp with FPs, BVI. 
--- /!\ TODO cleanup 
+-- /!\ TODO cleanup
+-- TODO : SCHEDULO INFOS BETTER 
 
 
 bodyInstanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 bodyInstanceParser = do
-	toTrash <- manyTill anyChar ((try . lookAhead $ do{test<- guardParser <* emptyArea
+	toTrash <- trace "poney" $ manyTill anyChar ((try . lookAhead $ do{test<- guardParser <* emptyArea
 						; string ":: ABSTRACT"
 						; return test}))
 	emptyArea *> string "fp :: ABSTRACT:"
@@ -376,23 +389,23 @@ bodyInstanceParser = do
 	emptyArea        --Well, not important but we store, never know
 	string "="
 	emptyArea 
-	nameModule <- guardParser 
+	nameModule <- trace "elephant" $ guardParser 
 	-- Eat until my position is good	
 	manyTill anyChar $ (try . lookAhead $ (string "[method"))
 	char '['
-	methNames <- (try parserMethName) `sepBy`  (emptyArea *> comma <* emptyArea )
+	methNames <- trace "drosophile" $ (try parserMethName) `sepBy`  (emptyArea *> comma <* emptyArea )
 
 	manyTill anyChar $ (try $ emptyArea *> string "SchedInfo" <* emptyArea )
-	scheduleInfos <- brackets $ (try parserSchedule) `sepBy` (emptyArea *> comma <* emptyArea )
-	let mapScheduling = foldl (\map (x,y,z) -> Map.insert (x,y) z map) Map.empty scheduleInfos   
+	scheduleInfos <- trace "langouste ".brackets $ (try parserSchedule) `sepBy` (emptyArea *> comma <* emptyArea )
+	let mapScheduling = foldl (\map (x,y,z) -> Map.insert (x,y) z map) Map.empty $ concat scheduleInfos   
 
 	
-        manyTill anyChar $ try (string "meth types=")
-	typesMethods <- trace "endive" $ brackets $ (try.parens $ parseTripletTypes) `sepBy` comma 
-	emptyArea	
+        trace "mouai " . manyTill anyChar $ try (string "meth types=")
+	typesMethods <- trace "poulet".brackets $ (try.parens $ parseTripletTypes) `sepBy` comma 
+	trace "souris" $ emptyArea	
 	let finalList = process typesMethods methNames
    		
-	return $ Right (finalList, mapScheduling)
+	return $ (trace "humhum" $ Right (finalList, mapScheduling))
 	where 	process l1 l2 = f $ List.zip l1 l2
 	      	f [] = []	      
 		f (((lArgsT,trigger,result),(mName,lArg)):q) = Fp{fpName = mName --TODO we forgot the trigger here.
@@ -429,14 +442,23 @@ parserMethName = do
 	
 
 
--- In a first time, we simplify the syntax for scheduling
-parserSchedule :: Parser (String, String, Conflict)
+-- Disgusting hacks here. ** Need refactoring **
+-- /!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\
+-- /!\ Lot of undefined behaviour are critic./!\
+-- /!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\
+
+parserSchedule :: Parser [(String, String, Conflict)]
 parserSchedule = do
-	r1 <- emptyArea *> identifier  
-	op <- emptyArea *> guardParser <* emptyArea
-	r2 <- identifier <* emptyArea
-	return $ (r1, r2, process op )
-	where 	process op = case lookup op l of
+	r1 <- emptyArea *> ((try.brackets.many $ noneOf [']']) <|> try identifier) 
+	op <- emptyArea *> identifier <* emptyArea
+	r2 <- ((try.brackets.many $ noneOf [']']) <|> identifier) <* emptyArea
+	return $ allCombines (inter r1) (inter r2) $ process op
+	where 	inter l = S.split [','] $ filter (\x -> x /= ' ' && x /= '\n' ) l --DON'T LOOK AT THIS 
+		allCombines [] l e = []
+		allCombines (t:q) l e = allCombine t l e ++ allCombines q l e
+		allCombine a [] e = []
+		allCombine a (t:q) e = (a,t,e) : allCombine a q e	  
+		process op = case lookup op l of
 				Just a -> a
 				Nothing -> undefined --Should not happen, ATS provided by BSC compiler
 		l = [("C", C ),
