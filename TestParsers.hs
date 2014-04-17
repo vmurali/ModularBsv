@@ -23,7 +23,8 @@ import qualified Text.ParserCombinators.Parsec.Token as P
 
 --AST of ATS
 
-data Expression = And String String
+data Expression = Renaming String
+	| And String String
 	| Or String String
 	| Not String
 	| Mux String String String
@@ -98,7 +99,7 @@ lexer = P.makeTokenParser defn
 defn = P.LanguageDef {
   P.commentStart = "/*",
   P.commentEnd = "*/",
-  P.commentLine = "**********",
+  P.commentLine = "**",
   P.nestedComments = False,
   P.opStart =  trace "l103" $ undefined,
   P.opLetter = trace "l104" $ undefined,
@@ -147,7 +148,7 @@ guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',',','=
 
 modulesParser :: Parser [Module]
 modulesParser = do
-	many . try $ do{manyTill anyChar (try $ reserved "=== ATS:");moduleParser}
+	many . try $ do{manyTill anyChar (try $ symbol "=== ATS:");moduleParser}
 	
 
 
@@ -156,11 +157,11 @@ moduleParser = do
 	manyTill anyChar (try $ reserved "APackage") 
 	nameModule <- identifier
 	listInstancesAndFormalParameters <-  instancesParser
-	manyTill anyChar . try $ reserved "-- AP local definitions"	
+	manyTill anyChar . try $ symbol "-- AP local definitions"	
 	listBindings <- lookAhead . many . try $ do{manyTill anyChar (lookAhead.try $ bindingParser);bindingParser}
-	manyTill anyChar . try $ reserved "-- AP rules"	
-	listRules<-many . try $ ruleParser
-	manyTill anyChar . try $ reserved "-- AP scheduling pragmas"	
+	manyTill anyChar . try $ symbol "-- AP rules"	
+	listRules<- many . try $ ruleParser
+	manyTill anyChar . try $ symbol "-- AP scheduling pragmas"	
 	listMethods <- many . try $ do{manyTill anyChar (try . lookAhead $ methodParser); methodParser}
 	let (inst,l) = E.partitionEithers listInstancesAndFormalParameters 
 	return $ Module{name=nameModule  --Test name
@@ -185,17 +186,13 @@ instancesParser = do
 	listFp <- apInstanceDocParser
 	let (listWithoutFp,singleFp) = List.partition (\x -> instName x /= "fp") listFp
 	return $ process listInstances listWithoutFp singleFp
-	  where process [] [] fp = []
-		process (t:q) [] fp = case t of
-					Left a -> (Left a):(process q [] fp)
-					Right (a,b) ->(Right(a, map words . instArgs . head $ fp, b)):(process q [] fp)
-		process (t:q) (r:s) fp = case t of 
-					Left a      -> if instName a == instName r then
-							(Left(a{instArgs=instArgs r})):(process q s fp)
-							else (Left a):(process q (r:s) fp)
-					Right (a,b) ->(Right(a, map words . instArgs . head $ fp, b)):(process q s fp)
+	  where process [] l fp = []
+		process (t:q) l fp = case t of
+					Left a -> (Left a{instArgs = (extr l $instName a)}):(process q l fp)
+					Right (a,b) ->(Right(a, map words . instArgs . head $ fp, b)):(process q l fp)
 					--If hd fails it's that there is no priority list in the sourcecode	
-
+		extr [] n= []
+		extr (t:q) n = if n == instName t then instArgs t else extr q  n
 
 instanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 instanceParser = do
@@ -239,7 +236,12 @@ bindingParser = do
 			, bindExpr = expression}
 
 expressionParser :: Parser Expression
-expressionParser = (try listParser <|> try binaryParser <|> try unaryParser) <* symbol ";" 
+expressionParser = (try renamingParser <|> try listParser <|> try binaryParser <|> try unaryParser <|> try callMethodParser) 
+
+renamingParser :: Parser Expression
+renamingParser = do
+	name <- identifier <* semi
+	return $ Renaming name  
 
 listParser :: Parser Expression
 listParser = do
@@ -247,13 +249,26 @@ listParser = do
 	first <- identifier
 	symbol "++"   
 	list  <- (try identifier) `sepBy1` symbol "++"   --TODO Is "try" required? 
+	semi
 	return . Concat $ first:list  --Check this code -> It was false in my opinion
+
+callMethodParser :: Parser Expression
+callMethodParser = do
+	nameList <- identifier `sepBy` dot   --TODO check that the list is always composed of 2 elements
+	args <- many $ identifier
+	semi
+	return . MCall $ MExpression{calledCond = Nothing
+				, calledModule = nameList !! 0
+				, calledMethod = nameList !! 1
+				, calledArgs = args } 	
+
 
 binaryParser :: Parser Expression 
 binaryParser = do
 	name1 <- identifier
 	op <-  guardParser --I can use operator parser
-	name2 <- identifier	
+	name2 <- identifier
+	semi	
 	return $  k op name1 name2
 	where 	k op name1 name2 = case (lookup op l) of
 					Just a -> a name1 name2
@@ -271,7 +286,7 @@ unaryParser =
 				; third <- identifier
 				; return $ Mux first second third }
               , k "extract" $ (trace "l274" $ undefined)  
-              , k "!" $ do{first <- identifier ; return  $ Not first} ]
+              , k "!" $ do{first <- identifier ; return  $ Not first} ] <* semi
   where
     k x p = (symbol x) *> p   --TODO Check this fucking emptyArea perhaps needed?
 
@@ -285,7 +300,8 @@ unaryParser =
 
 ruleParser :: Parser Rule 
 ruleParser = do
-	manyTill anyChar . try $ symbol "rule"
+	trash <- manyTill anyChar ( (lookAhead $ symbol "-- AP scheduling pragmas") <|> (try $ symbol "rule"))
+	notFollowedBy $ symbol "-- AP scheduling pragmas"
 	processedName <- identifier         --TESTING TODO
 	realName <- identifier <* colon               --CHECK THAT	
 	guard <- symbol "when" *> identifier <* symbol "==>"
