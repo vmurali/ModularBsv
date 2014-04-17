@@ -98,13 +98,13 @@ lexer = P.makeTokenParser defn
 defn = P.LanguageDef {
   P.commentStart = "/*",
   P.commentEnd = "*/",
-  P.commentLine = "--",
+  P.commentLine = "**********",
   P.nestedComments = False,
-  P.opStart =  undefined,
-  P.opLetter = undefined,
-  P.reservedOpNames = undefined,
-  P.identStart      = letter,
-  P.identLetter     = alphaNum <|> char '_',
+  P.opStart =  trace "l103" $ undefined,
+  P.opLetter = trace "l104" $ undefined,
+  P.reservedOpNames = trace "l105" $ undefined,
+  P.identStart      = alphaNum <|> oneOf "_$\'",
+  P.identLetter     = alphaNum <|> oneOf "_$\'",
   P.reservedNames   = [ 
                       ],
   P.caseSensitive   = True
@@ -115,12 +115,16 @@ whiteSpace = P.whiteSpace lexer  --comments are judged as whitespaces
 brackets   = P.brackets lexer
 braces     = P.braces lexer
 semi       = P.semi lexer
+dot 	   = P.dot lexer
 comma      = P.comma lexer
 colon      = P.colon lexer
-identifier = P.identifier lexer
+quotedString = between (symbol "\"") (symbol "\"") (many $ noneOf "\"")
+identifier = quotedString <|> P.identifier lexer
 lexeme     = P.lexeme lexer
 reserved   = P.reserved lexer    
 reservedOp = P.reservedOp lexer
+symbol	   = P.symbol lexer
+integer    = P.integer lexer
 parens     = P.parens lexer
 emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 
@@ -150,7 +154,7 @@ modulesParser = do
 moduleParser :: Parser Module
 moduleParser = do
 	manyTill anyChar (try $ reserved "APackage") 
-	nameModule <- guardParser 
+	nameModule <- identifier
 	listInstancesAndFormalParameters <-  instancesParser
 	manyTill anyChar . try $ reserved "-- AP local definitions"	
 	listBindings <- lookAhead . many . try $ do{manyTill anyChar (lookAhead.try $ bindingParser);bindingParser}
@@ -195,15 +199,15 @@ instancesParser = do
 
 instanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 instanceParser = do
-	toTrash <- manyTill anyChar ((try . lookAhead $ do{test<- guardParser
-						; string ":: ABSTRACT"
-						; return test}))
-	nameInst <- guardParser
-	string ":: ABSTRACT:"
-	notImportant <- guardParser
+	toTrash <- manyTill anyChar ((try . lookAhead $ do{test<- identifier
+						; symbol "::" <* symbol "ABSTRACT"}))
+	nameInst <- identifier
+	symbol "::"
+	symbol "ABSTRACT:"
+	notImportant <- identifier `sepBy` dot
 	--Well, not important but we store, never know
-	string "=" 
-	nameModule <- guardParser 
+	symbol "=" 
+	nameModule <- identifier 
         return $ Left Instance {instName = nameInst 
 			, instModule = nameModule 
 			, instArgs = [] }
@@ -225,40 +229,35 @@ bindingParser :: Parser Binding
 bindingParser = do
 --We parse the first line
 	name <- identifier 
-	emptyArea
-	string ":: Bit "
-	size <- many digit 		
-	emptyArea
-	char ';'
-	emptyArea
+	symbol "::" <* symbol "Bit"
+	size <- integer <* semi               -- TODO I think it's correct many digit 		
 --We parse the second line with the same name
-	string name <* emptyArea
-	string "="
+	symbol name <* symbol "="
 	expression <- expressionParser	
 	return $ Binding{bindName = name
-			, bindSize = numberValue 10 size 
+			, bindSize = size    --Check that 
 			, bindExpr = expression}
 
 expressionParser :: Parser Expression
-expressionParser = (try listParser <|> try binaryParser <|> try unaryParser) <* string ";" 
+expressionParser = (try listParser <|> try binaryParser <|> try unaryParser) <* symbol ";" 
 
 listParser :: Parser Expression
 listParser = do
 	--Dirty hack. TODO sepBy2 
-	first <- guardParser
-	string "++"    
-	list  <- guardParser `sepBy1` string "++" 
-	return $ Concat $ first:list
+	first <- identifier
+	symbol "++"   
+	list  <- (try identifier) `sepBy1` symbol "++"   --TODO Is "try" required? 
+	return . Concat $ first:list  --Check this code -> It was false in my opinion
 
 binaryParser :: Parser Expression 
 binaryParser = do
-	name1 <- guardParser
+	name1 <- identifier
 	op <-  guardParser --I can use operator parser
-	name2 <- guardParser	
+	name2 <- identifier	
 	return $  k op name1 name2
 	where 	k op name1 name2 = case (lookup op l) of
 					Just a -> a name1 name2
-					Nothing -> undefined --Fraction of BSV
+					Nothing -> trace "l261" $ undefined --Fraction of BSV
 		l = [("==", \x y -> Equal x y),   --Set of supported operators
 			("&&", \x y -> And x y ),
 			("||", \x y -> Or x y ),
@@ -267,14 +266,14 @@ binaryParser = do
 
 unaryParser :: Parser Expression   
 unaryParser =
-	choice [ k "_if_" $ do{first <- guardParser
-				; second <- guardParser
-				; third <- guardParser
+	choice [ k "_if_" $ do{first <- identifier
+				; second <- identifier
+				; third <- identifier
 				; return $ Mux first second third }
-              , k "extract" $ undefined  
-              , k "!" $ undefined ]
+              , k "extract" $ (trace "l274" $ undefined)  
+              , k "!" $ do{first <- identifier ; return  $ Not first} ]
   where
-    k x p = (emptyArea *> string x) *> p
+    k x p = (symbol x) *> p   --TODO Check this fucking emptyArea perhaps needed?
 
 
 --
@@ -286,11 +285,10 @@ unaryParser =
 
 ruleParser :: Parser Rule 
 ruleParser = do
-	manyTill anyChar . try $ string "rule"
-	processedName <- guardParser         --TESTING TODO
-	realName <- string "\"" *> identifier <* string "\":"	
-	guard <- emptyArea *> string "when" *> guardParser 
-	string "==>" <* emptyArea
+	manyTill anyChar . try $ symbol "rule"
+	processedName <- identifier         --TESTING TODO
+	realName <- identifier <* colon               --CHECK THAT	
+	guard <- symbol "when" *> identifier <* symbol "==>"
  	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> (try methodCallParser)) 	 		
 	return $ Rule{ruleName = processedName 
 			, ruleGuard = guard
@@ -302,16 +300,14 @@ ruleParser = do
 -- Parser for bodies of methods/rules
 
 ifMethodCallParser = do
-	emptyArea *> string "if" 
-	nameCond  <- guardParser <* string "then" <* emptyArea
+	nameCond  <- symbol "if" *> identifier <* symbol "then"
 	(cond,moduleName,methodName,args) <- methodCallParser
 	return $ (Just nameCond, moduleName, methodName, args)    	
 
 methodCallParser = do 
-	moduleName <- identifier <* char '.'   --TESTING TODO	
-	methodName <- guardParser
-        args <- many $ guardParser
-	char ';' <* emptyArea
+	moduleName <- identifier <* symbol "."   --TESTING TODO	
+	methodName <- identifier
+        args <- (many $ identifier) <* semi 
 	return $ (Nothing, moduleName, methodName, args)
 
 
@@ -337,43 +333,39 @@ methodParser = do
 			[(_,_,b)] -> case args of
 				[] -> Value0 b
 				_  -> Value b
-			_ -> undefined --TODO Correct?  ActionValue	  
+			_ -> trace "l337" $ undefined --TODO Correct?  ActionValue	  
 
 
 --TODO prettyfication
 argMethodParser :: Parser (ResultOrArg,String,Integer)
 argMethodParser = do
 	name <- identifier 
-	emptyArea *> string ":: Bit "
-	size <- many digit 		
-	emptyArea *> char ';' <* emptyArea
-	return (Arg, name, numberValue 10 size)
+	symbol "::" *> symbol "Bit"
+	size <- integer <* semi                --Many digit	
+	return (Arg, name, size)
 		
 resultParser :: Parser (ResultOrArg,String,Integer)
 resultParser = do
-	emptyArea
-	name <- guardParser <* string ":: Bit "  --TODO testing
-	size <- many digit <* emptyArea <* char ';'
+	name <- identifier <* symbol "::" <* symbol "Bit"  --TODO testing
+	size <- integer <* semi
 	--Second line : assignment
-	emptyArea *> string name <* string " ="
+	symbol name <* symbol "="
 	expression <- expressionParser	
-	return $ (Result, name, numberValue 10 size)
+	return $ (Result, name, size)
 		
 
 --TODO factorize : we can use ruleBodyParser here.
 methodBodyParser :: Parser Method 
 methodBodyParser = do
-	string "rule"
-	processedName <- guardParser  --Rely on Whitespace TODO check if I can erase the "  
-	realName <- string "\"" *> identifier  <* string "\":" 			
-	notImportant <- emptyArea *> string "when" *> guardParser  
-	string "==>" <* emptyArea
+	symbol "rule"
+	processedName <- identifier  --Rely on Whitespace TODO check if I can erase the "  
+	realName <- identifier <* colon <* symbol "when" <* identifier  <* symbol "==>"
  	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> methodCallParser) 	 		
-	trash <- many $ noneOf [']']    --We have to eat all the useless stuff, until the ] appears. 
+	many $ noneOf [']']    --We have to eat all the useless stuff, until the ] appears. 
 	return $ Method{methodName = processedName 
 			, methodGuard = "RDY_" ++ processedName  --TODO check if we need bindings
-			, methodType = undefined
-			, methodArgs = undefined
+			, methodType = trace "methodType" $ undefined
+			, methodArgs = trace "methodArgs" $ undefined
 			, methodBody = toMExpr listExpr}
 	where toMExpr = map (\(t,x,y,z) -> MExpression{calledCond = t, calledModule = x, calledMethod = y, calledArgs = z})	
 
@@ -388,24 +380,21 @@ methodBodyParser = do
 
 bodyInstanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 bodyInstanceParser = do
-	toTrash <-  manyTill anyChar ((try . lookAhead $ do{test<- guardParser <* emptyArea
-						; string ":: ABSTRACT"
-						; return test}))
-	emptyArea *> string "fp :: ABSTRACT:"
-	notImportant <- guardParser
-	string "="
-	nameModule <-  guardParser 
+	toTrash <-  manyTill anyChar . try . lookAhead $ identifier <* symbol "::" <* symbol "ABSTRACT"
+	symbol "fp" <* symbol "::" <* symbol "ABSTRACT:" <* (identifier `sepBy` dot) 
+	symbol "="
+	nameModule <-  identifier 
 	-- Eat until my position is good	
-	manyTill anyChar $ (try . lookAhead $ (string "[method"))
-	char '['
-	methNames <- (try parserMethName) `sepBy` (emptyArea *> comma <* emptyArea)  --TODO Testing
-	(manyTill anyChar $ (try $ string "SchedInfo")) <* emptyArea    --EMPTY AREA NEEDED
-	scheduleInfos <- brackets $ (try parserSchedule) `sepBy` (emptyArea *> comma <* emptyArea) --TODO Testing
+	manyTill anyChar . try . lookAhead $ (symbol "[method")
+	symbol "["
+	methNames <- (try parserMethName) `sepBy` comma  
+	(manyTill anyChar . try $ symbol "SchedInfo")    --EMPTY AREA NEEDED ? TODO
+	scheduleInfos <- brackets $ (try parserSchedule) `sepBy`  comma --TODO Testing
 	let mapScheduling = foldl (\map (x,y,z) -> Map.insert (x,y) z map) Map.empty $ concat scheduleInfos   
 
 	
-        manyTill anyChar $ try (string "meth types=")
-	typesMethods <- brackets $ (try.parens $ parseTripletTypes) `sepBy` (emptyArea *> comma <* emptyArea ) 
+        manyTill anyChar . try $ symbol "meth" <* symbol "types" <* symbol "="
+	typesMethods <- brackets $ (try.parens $ parseTripletTypes) `sepBy` comma  
 	let finalList = process typesMethods methNames
    		
 	return $ (Right (finalList, mapScheduling))
@@ -425,25 +414,23 @@ bodyInstanceParser = do
 
 parserMethName :: Parser (String,[String])
 parserMethName = do
-	emptyArea *> string "method" <* emptyArea
+	symbol "method"
 	option "" . parens . try . many $ noneOf [')']   --TODO Check if it"s correct
-	nameMeth <- guardParser 
-	args <- option [] . parens $ (try . parens $ do{name<-guardParser 
-					; comma <* emptyArea 
+	nameMeth <- identifier 
+	args <- option [] . parens $ (try . parens $ do{name<-identifier <* comma
 					; brackets . many $ noneOf [']']
-					; return name}) `sepBy` (emptyArea *> string "," <* emptyArea )  
+					; return name}) `sepBy` comma
 	--Throw it away!
 	
-	option "" $ emptyArea *> string "enable" <* emptyArea 
+	option "" $ symbol "enable" 
 	option "" . parens . parens . try . many $ noneOf [')']
-	emptyArea *> string "clocked_by" <* emptyArea 
+	symbol "clocked_by" 
 	option "" . parens . try . many $ noneOf [')']
-	emptyArea *> string "reset_by" <* emptyArea
+	symbol "reset_by"
 	option "" . parens . try . many $ noneOf [')']
- 	emptyArea *> string ";" <* emptyArea 
+ 	semi 
 	return (nameMeth, args)	 	    
 	
-
 
 -- Disgusting hacks here. ** Need refactoring **
 -- /!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\
@@ -452,9 +439,9 @@ parserMethName = do
 
 parserSchedule :: Parser [(String, String, Conflict)]
 parserSchedule = do
-	r1 <- emptyArea *> ((try.brackets.many $ noneOf [']']) <|> try identifier) 
-	op <- emptyArea *> identifier <* emptyArea
-	r2 <- ((try.brackets.many $ noneOf [']']) <|> identifier) <* emptyArea
+	r1 <- ((try.brackets.many $ noneOf [']']) <|> try identifier) 
+	op <- identifier
+	r2 <- ((try.brackets.many $ noneOf [']']) <|> identifier)
 	return $ allCombines (inter r1) (inter r2) $ process op
 	where 	inter l = S.split [','] $ filter (\x -> x /= ' ' && x /= '\n' ) l --DON'T LOOK AT THIS 
 		allCombines [] l e = []
@@ -463,7 +450,7 @@ parserSchedule = do
 		allCombine a (t:q) e = (a,t,e) : allCombine a q e	  
 		process op = case lookup op l of
 				Just a -> a
-				Nothing -> undefined --Should not happen, ATS provided by BSC compiler
+				Nothing -> trace "l454" $ undefined --Should not happen, ATS provided by BSC compiler
 		l = [("C", C ),
 			("CF", CF ),
 			("SB", SB ),
@@ -483,25 +470,23 @@ parseTripletTypes = do
 
 bitParser :: Parser Integer
 bitParser = do
-	emptyArea *> string "Bit" <* emptyArea
-	listOfChar <- many $ digit <* emptyArea
-	return $ numberValue 10 listOfChar  
+	symbol "Bit"
+	val <- integer
+	return $ val  
 
 maybeParser :: Parser (Maybe Integer)
 maybeParser = (try justP)<|>nothingP 
 
 justP :: Parser (Maybe Integer)
 justP = do
-	emptyArea
-	string "Just "
-	listOfChar <- parens $ (string "Bit " *> (many $ digit))
-	return $ Just (numberValue 10 listOfChar) -- Decimal notation
-
+	symbol "Just"
+	extract <- parens $ bitParser
+	return $ Just extract
 
 
 nothingP :: Parser (Maybe Integer)
 nothingP = do
-	emptyArea *> string "Nothing" <* emptyArea --TODO : check
+	symbol "Nothing"  --TODO : check
 	return Nothing
 
 
@@ -514,9 +499,8 @@ formalParametersParser = many $ try formalParameterParser
 
 formalParameterParser :: Parser Instance
 formalParameterParser = do
-	name <- emptyArea *>identifier <* string ":"
-	emptyArea
-	par <- parens $ (many $ emptyArea *> ((try.parens.many $ noneOf [')']) <|> identifier) <* emptyArea)  
+	name <- identifier <* colon
+	par <- parens . many $  (try.parens.many $ noneOf [')']) <|> identifier  
 	return Instance{instName = name
  		, instModule = "hack" --I don't remember why I thought it was smart to return Instance ... 
 		, instArgs = par}
