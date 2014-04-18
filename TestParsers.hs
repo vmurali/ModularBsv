@@ -28,11 +28,27 @@ data Expression = Renaming String
 	| Or String String
 	| Not String
 	| Mux String String String
+	| RShift String String 
+	| LShift String String
 	| Extract String Integer Integer 
 	| MCall MExpression --The same
 	| Equal String String
 	| Concat [String] --Concat wires
 	| Plus String String
+	| BNot String
+	| Times String String
+	| Divide String String
+	| Modulus String String
+	| Lt String String
+	| Gt String String 
+	| LtEq String String
+	| GtEq String String 
+	| ULtEq String String
+	| UGtEq String String 
+	| BAnd String String
+	| BOr String String 
+	| BXor String String
+	| NotEqual String String
 	| Minus String String
 	deriving(Show,Eq)
 
@@ -120,7 +136,8 @@ dot 	   = P.dot lexer
 comma      = P.comma lexer
 colon      = P.colon lexer
 quotedString = between (symbol "\"") (symbol "\"") (many $ noneOf "\"")
-identifier = quotedString <|> P.identifier lexer
+identifier = try typedIdentifier <|> try quotedString <|> P.identifier lexer
+typedIdentifier = parens (symbol "_" *> option "_" (brackets $  P.identifier lexer) <* symbol "::" <* symbol "Bit" <* integer)  --To avoid useless recursivity 
 lexeme     = P.lexeme lexer
 reserved   = P.reserved lexer    
 reservedOp = P.reservedOp lexer
@@ -136,7 +153,7 @@ emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 -- 
 --
 
-guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',',','=']) <* emptyArea   
+opParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';']) <* emptyArea   
 
 
 
@@ -264,7 +281,7 @@ callMethodParser = do
 binaryParser :: Parser Expression 
 binaryParser = do
 	name1 <- identifier
-	op <-  guardParser --I can use operator parser
+	op <-  opParser --I can use operator parser
 	name2 <- identifier
 	semi	
 	return $  k op name1 name2
@@ -272,9 +289,27 @@ binaryParser = do
 					Just a -> a name1 name2
 					Nothing -> trace "l261" $ undefined --Fraction of BSV
 		l = [("==", \x y -> Equal x y),   --Set of supported operators
+			("!=", \x y -> NotEqual x y ),
 			("&&", \x y -> And x y ),
 			("||", \x y -> Or x y ),
+			(">>", \x y -> RShift x y ),
+			("<<", \x y -> LShift x y ),
+
+			("<", \x y -> Lt x y ),
+			(">", \x y -> Gt x y ),
+			("<=", \x y -> LtEq x y ),
+			(">=", \x y -> GtEq x y ),
+			(".<=", \x y -> ULtEq x y ),
+			(".>=", \x y -> UGtEq x y ),
+
+			("&", \x y -> BAnd x y ),
+			("^", \x y -> BXor x y ),
+			("|", \x y -> BOr x y ),
+			
 			("+", \x y -> Plus x y ),
+			("*", \x y -> Times x y ),
+			("/", \x y -> Divide x y ),
+			("%", \x y -> Modulus x y ),
 			("-", \x y -> Minus x y )]
 
 unaryParser :: Parser Expression   
@@ -283,8 +318,9 @@ unaryParser =
 				; second <- identifier
 				; third <- identifier
 				; return $ Mux first second third }
-              , k "extract" $ (trace "l274" $ undefined)  
-              , k "!" $ do{first <- identifier ; return  $ Not first} ] <* semi
+              , k "extract" $ (trace "l274" $ undefined) -- TODO DEFINE THIS THING 
+              , k "!" $ do{first <- identifier ; return  $ Not first} 
+	      , k "~" $ do{first<- identifier ; return $ BNot first}] <* semi
   where
     k x p = (symbol x) *> p   
 
@@ -335,19 +371,36 @@ methodCallParser = do
 
 data ResultOrArg = Result | Arg deriving(Show,Eq)
 
+typeMethodParser :: Parser Bool
+typeMethodParser = 
+	 (try (symbol "AIDef") *> return True) <|>
+	 (try (symbol "AIAction") *> return False) <|>
+	 (try (symbol "AIActionValue") *> return False) <|>
+	 ((symbol "AIValue") *> return True)
+
+
 methodParser :: Parser Method
-methodParser = do
+methodParser = do  --USE THE COMMENTS
+	isValue <- symbol "--" *> typeMethodParser
+	nameM <- identifier
 	listArgs <- many $  (try resultParser) <|> try argMethodParser
 	let (lResult, lArgs) = List.partition (\(x,y,z) -> x == Result) listArgs
-	method <- brackets $ methodBodyParser 
-	return method{methodArgs = process1 lArgs, methodType = process2 lArgs lResult}
+	method <- (brackets $ try methodBodyParser) <|> withoutBodyMethodParser
+	if isValue 
+		then let (_, _, size) = head lResult  
+			in return method{methodName = nameM
+					, methodGuard = "RDY_" ++ nameM
+					, methodType = process3 lArgs size
+					, methodArgs = process1 lArgs}
+		else return method{methodArgs = process1 lArgs, methodType = process2 lResult}
 	  where	process1 = map (\(x,y,z)->(y,z)) 
-		process2 args res = case res of
+		process2 res = case res of
 			[] -> Action  
-			[(_,_,b)] -> case args of
-				[] -> Value0 b
-				_  -> Value b
-			_ -> trace "l337" $ undefined --TODO Correct?  ActionValue	  
+			[(_,_,b)] -> ActionValue b
+			_ -> trace "l386" $ undefined --TODO Correct?  ActionValue	  
+		process3 l n = case l of 
+			[] -> Value0 n
+			_ -> Value n
 
 
 argMethodParser :: Parser (ResultOrArg,String,Integer)
@@ -365,6 +418,17 @@ resultParser = do
 	symbol name <* symbol "="
 	expression <- expressionParser	
 	return $ (Result, name, size)
+
+
+withoutBodyMethodParser :: Parser Method
+withoutBodyMethodParser = do
+	notFollowedBy . brackets $ symbol "rule" *> noneOf "]"
+	brackets . symbol $ ""
+      	return $ Method{methodName = undefined
+				, methodGuard = undefined
+				, methodType = undefined
+				, methodArgs = undefined
+				, methodBody = []} 
 		
 
 --TODO factorize : we can use ruleBodyParser here.
@@ -375,7 +439,7 @@ methodBodyParser = do
 	realName <- identifier <* colon <* symbol "when" <* identifier  <* symbol "==>"
  	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> methodCallParser) 	 		
 	many $ noneOf [']']    --We have to eat all the useless stuff, until the ] appears. 
-	return $ Method{methodName = processedName 
+	return $  Method{methodName = processedName 
 			, methodGuard = "RDY_" ++ processedName  --TODO check if we need bindings
 			, methodType = trace "methodType" $ undefined
 			, methodArgs = trace "methodArgs" $ undefined
@@ -406,24 +470,23 @@ bodyInstanceParser = do
 	
         manyTill anyChar . try $ symbol "meth" <* symbol "types" <* symbol "="
 	typesMethods <- brackets $ (try.parens $ parseTripletTypes) `sepBy` comma  
-	let finalList = process typesMethods methNames
-   		
+	let finalList = process typesMethods (snd . unzip $ methNames) (fst . unzip $ methNames)
 	return $ (Right (finalList, mapScheduling))
-	where 	process l1 l2 = f $ List.zip l1 l2
-	      	f [] = []	      
-		f (((lArgsT,trigger,result),(mName,lArg)):q) = Fp{fpName = mName --TODO we forgot the trigger here.
-				, fpType = sayMeMyType lArgsT result
-				, fpArgs = zip lArg lArgsT }:(f q)
-		sayMeMyType args res = case res of              --TODO : hardly defined before ... factorization
+	where 	process l1 l2 t= f t $ List.zip l1 l2
+	      	f t [] = []	      
+		f (t:e) (((lArgsT,trigger,result),(mName,lArg)):q) = Fp{fpName = mName --TODO we forgot the trigger here.
+				, fpType = sayMeMyType lArgsT result t
+				, fpArgs = zip lArg lArgsT }:(f e q)
+		sayMeMyType args res bl = case res of              --TODO : hardly defined before ... factorization
 					Nothing -> Action  
 					Just b  -> case args of
-						[] -> Value0 b 
-						_  -> Value b  --TODO : need a hack for actions value
+						[] -> if bl then Value0 b else ActionValue b
+						_  -> if bl then Value b else ActionValue b --TODO : need a hack for actions value
 
 -- method (cpuToHost, [])cpuToHost enable ((EN_cpuToHost,
 -- [])) clocked_by (default_clock) reset_by (default_reset);,
 
-parserMethName :: Parser (String,[String])
+parserMethName :: Parser (Bool,(String,[String]))
 parserMethName = do
 	symbol "method"
 	option "" . parens . try . many $ noneOf [')']
@@ -433,14 +496,14 @@ parserMethName = do
 					; return name}) `sepBy` comma
 	--Throw it away!
 	
-	option "" $ symbol "enable" 
+	isNotActionValue <- option "___ISNOTANACTIONVALUE" $ symbol "enable"   --DIRTYTRICK TODO
 	option "" . parens . parens . try . many $ noneOf [')']
 	symbol "clocked_by" 
 	option "" . parens . try . many $ noneOf [')']
 	symbol "reset_by"
 	option "" . parens . try . many $ noneOf [')']
  	semi 
-	return (nameMeth, args)	 	    
+	return (isNotActionValue == "___ISNOTANACTIONVALUE", (nameMeth, args))	 	    
 	
 
 -- Disgusting hacks here. ** Need refactoring **
