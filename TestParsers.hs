@@ -30,11 +30,12 @@ data Expression = Renaming String
 	| Mux String String String
 	| RShift String String 
 	| LShift String String
-	| Extract String Integer Integer 
+	| Extract String String String 
 	| MCall MExpression --The same
 	| Equal String String
 	| Concat [String] --Concat wires
 	| Plus String String
+	| Sext String
 	| BNot String
 	| Times String String
 	| Divide String String
@@ -43,6 +44,9 @@ data Expression = Renaming String
 	| Gt String String 
 	| LtEq String String
 	| GtEq String String 
+	| ULt String String
+	| UGt String String
+	| PrimArrayDynSelect String String 
 	| ULtEq String String
 	| UGtEq String String 
 	| BAnd String String
@@ -50,6 +54,8 @@ data Expression = Renaming String
 	| BXor String String
 	| NotEqual String String
 	| Minus String String
+	| R3Shift String String
+	| L3Shift String String
 	deriving(Show,Eq)
 
 data Module = Module { name :: String
@@ -178,7 +184,7 @@ moduleParser = do
 	manyTill anyChar . try $ symbol "-- AP rules"	
 	listRules<- many . try $ ruleParser
 	manyTill anyChar . try $ symbol "-- AP scheduling pragmas"	
-	listMethods <- many . try $ do{manyTill anyChar (try . lookAhead $ methodParser); methodParser}
+	listMethods <- many . try $ do{manyTill anyChar ((lookAhead $ symbol "-----") *> return undefined <|> (try . lookAhead $ methodParser)); methodParser}  --Little bit Hacky TODO...
 	let (inst,l) = E.partitionEithers listInstancesAndFormalParameters 
 	return $ Module{name=nameModule  --Test name
 			, instances = inst
@@ -252,7 +258,7 @@ bindingParser = do
 			, bindExpr = expression}
 
 expressionParser :: Parser Expression
-expressionParser = (try renamingParser <|> try listParser <|> try binaryParser <|> try unaryParser <|> try callMethodParser) 
+expressionParser = (try renamingParser <|> try listParser  <|> try unaryParser <|> try callMethodParser<|> try binaryParser) 
 
 renamingParser :: Parser Expression
 renamingParser = do
@@ -269,7 +275,7 @@ listParser = do
 
 callMethodParser :: Parser Expression
 callMethodParser = do
-	nameList <- identifier `sepBy` dot   --TODO check that the list is always composed of 2 elements
+	nameList <- identifier `sepBy1` dot   --TODO check that the list is always composed of 2 elements
 	args <- many $ identifier
 	semi
 	return . MCall $ MExpression{calledCond = Nothing
@@ -287,14 +293,16 @@ binaryParser = do
 	return $  k op name1 name2
 	where 	k op name1 name2 = case (lookup op l) of
 					Just a -> a name1 name2
-					Nothing -> trace "l261" $ undefined --Fraction of BSV
+					Nothing -> undefined --HACKY Fraction of BSV
 		l = [("==", \x y -> Equal x y),   --Set of supported operators
 			("!=", \x y -> NotEqual x y ),
 			("&&", \x y -> And x y ),
 			("||", \x y -> Or x y ),
 			(">>", \x y -> RShift x y ),
 			("<<", \x y -> LShift x y ),
-
+			("<<<", \x y -> L3Shift x y),
+			(">>>", \x y -> R3Shift x y),
+			
 			("<", \x y -> Lt x y ),
 			(">", \x y -> Gt x y ),
 			("<=", \x y -> LtEq x y ),
@@ -302,6 +310,9 @@ binaryParser = do
 			(".<=", \x y -> ULtEq x y ),
 			(".>=", \x y -> UGtEq x y ),
 
+			(".<", \x y -> ULt x y ),
+			(".>", \x y -> UGt x y ),
+			
 			("&", \x y -> BAnd x y ),
 			("^", \x y -> BXor x y ),
 			("|", \x y -> BOr x y ),
@@ -318,9 +329,15 @@ unaryParser =
 				; second <- identifier
 				; third <- identifier
 				; return $ Mux first second third }
-              , k "extract" $ (trace "l274" $ undefined) -- TODO DEFINE THIS THING 
+              , k "extract" $ do{first <- identifier
+				  ; second <- identifier 
+				  ; third <- identifier 
+				  ; return $ Extract first second third} -- TODO DEFINE THIS THING 
               , k "!" $ do{first <- identifier ; return  $ Not first} 
-	      , k "~" $ do{first<- identifier ; return $ BNot first}] <* semi
+	      , k "~" $ do{first<- identifier ; return $ BNot first}
+	      , k "sext" $ do{first <- identifier; return $ Sext first}
+	      , k "PrimArrayDynSelect" $ do{first<- identifier; second <- identifier
+					; return $ PrimArrayDynSelect first second} ] <* semi         --WHAT IS IT? TODO
   where
     k x p = (symbol x) *> p   
 
