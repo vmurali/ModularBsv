@@ -134,7 +134,6 @@ emptyArea  = many $ char ' ' <|> char '\t' <|> char '\n'
 -- It's a more general Parser than the identifier
 -- e.g "8d'5464" is parsed  by guardParser.
 -- 
--- TODO : Maybe we can always replace [identifier] by [guardParser]
 --
 
 guardParser = emptyArea *> (many1 $ noneOf ['\n',' ','\t',';',':','(',')',',','=']) <* emptyArea   
@@ -150,7 +149,7 @@ modulesParser :: Parser [Module]
 modulesParser = do
 	many . try $ do{manyTill anyChar (try $ symbol "=== ATS:");moduleParser}
 	
-
+-- My idea : one file for each module.
 
 moduleParser :: Parser Module
 moduleParser = do
@@ -227,7 +226,7 @@ bindingParser = do
 --We parse the first line
 	name <- identifier 
 	symbol "::" <* symbol "Bit"
-	size <- integer <* semi               -- TODO I think it's correct many digit 		
+	size <- integer <* semi              
 --We parse the second line with the same name
 	symbol name <* symbol "="
 	expression <- expressionParser	
@@ -245,10 +244,9 @@ renamingParser = do
 
 listParser :: Parser Expression
 listParser = do
-	--Dirty hack. TODO sepBy2 
 	first <- identifier
 	symbol "++"   
-	list  <- (try identifier) `sepBy1` symbol "++"   --TODO Is "try" required? 
+	list  <- (try identifier) `sepBy1` symbol "++"  
 	semi
 	return . Concat $ first:list  --Check this code -> It was false in my opinion
 
@@ -288,7 +286,7 @@ unaryParser =
               , k "extract" $ (trace "l274" $ undefined)  
               , k "!" $ do{first <- identifier ; return  $ Not first} ] <* semi
   where
-    k x p = (symbol x) *> p   --TODO Check this fucking emptyArea perhaps needed?
+    k x p = (symbol x) *> p   
 
 
 --
@@ -302,7 +300,7 @@ ruleParser :: Parser Rule
 ruleParser = do
 	trash <- manyTill anyChar ( (lookAhead $ symbol "-- AP scheduling pragmas") <|> (try $ symbol "rule"))
 	notFollowedBy $ symbol "-- AP scheduling pragmas"
-	processedName <- identifier         --TESTING TODO
+	processedName <- identifier 
 	realName <- identifier <* colon               --CHECK THAT	
 	guard <- symbol "when" *> identifier <* symbol "==>"
  	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> (try methodCallParser)) 	 		
@@ -321,7 +319,7 @@ ifMethodCallParser = do
 	return $ (Just nameCond, moduleName, methodName, args)    	
 
 methodCallParser = do 
-	moduleName <- identifier <* symbol "."   --TESTING TODO	
+	moduleName <- identifier <* symbol "."
 	methodName <- identifier
         args <- (many $ identifier) <* semi 
 	return $ (Nothing, moduleName, methodName, args)
@@ -340,7 +338,7 @@ data ResultOrArg = Result | Arg deriving(Show,Eq)
 methodParser :: Parser Method
 methodParser = do
 	listArgs <- many $  (try resultParser) <|> try argMethodParser
-	let (lResult, lArgs) = List.partition (\(x,y,z) -> x == Result) listArgs  --TODO : check partition  
+	let (lResult, lArgs) = List.partition (\(x,y,z) -> x == Result) listArgs
 	method <- brackets $ methodBodyParser 
 	return method{methodArgs = process1 lArgs, methodType = process2 lArgs lResult}
 	  where	process1 = map (\(x,y,z)->(y,z)) 
@@ -352,7 +350,6 @@ methodParser = do
 			_ -> trace "l337" $ undefined --TODO Correct?  ActionValue	  
 
 
---TODO prettyfication
 argMethodParser :: Parser (ResultOrArg,String,Integer)
 argMethodParser = do
 	name <- identifier 
@@ -362,7 +359,7 @@ argMethodParser = do
 		
 resultParser :: Parser (ResultOrArg,String,Integer)
 resultParser = do
-	name <- identifier <* symbol "::" <* symbol "Bit"  --TODO testing
+	name <- identifier <* symbol "::" <* symbol "Bit"
 	size <- integer <* semi
 	--Second line : assignment
 	symbol name <* symbol "="
@@ -374,7 +371,7 @@ resultParser = do
 methodBodyParser :: Parser Method 
 methodBodyParser = do
 	symbol "rule"
-	processedName <- identifier  --Rely on Whitespace TODO check if I can erase the "  
+	processedName <- identifier
 	realName <- identifier <* colon <* symbol "when" <* identifier  <* symbol "==>"
  	listExpr <- braces $ (many $ (try ifMethodCallParser) <|> methodCallParser) 	 		
 	many $ noneOf [']']    --We have to eat all the useless stuff, until the ] appears. 
@@ -390,8 +387,6 @@ methodBodyParser = do
 
 --
 -- Parser for fp with FPs, BVI. 
--- /!\ TODO cleanup
--- TODO : Priority INFOS BETTER 
 
 
 bodyInstanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
@@ -404,8 +399,8 @@ bodyInstanceParser = do
 	manyTill anyChar . try . lookAhead $ (symbol "[method")
 	symbol "["
 	methNames <- (try parserMethName) `sepBy` comma  
-	(manyTill anyChar . try $ symbol "SchedInfo")    --EMPTY AREA NEEDED ? TODO
-	scheduleInfos <- brackets $ (try parserSchedule) `sepBy`  comma --TODO Testing
+	(manyTill anyChar . try $ symbol "SchedInfo")
+	scheduleInfos <- brackets $ (try parserSchedule) `sepBy`  comma
 	let mapScheduling = foldl (\map (x,y,z) -> Map.insert (x,y) z map) Map.empty $ concat scheduleInfos   
 
 	
@@ -431,7 +426,7 @@ bodyInstanceParser = do
 parserMethName :: Parser (String,[String])
 parserMethName = do
 	symbol "method"
-	option "" . parens . try . many $ noneOf [')']   --TODO Check if it"s correct
+	option "" . parens . try . many $ noneOf [')']
 	nameMeth <- identifier 
 	args <- option [] . parens $ (try . parens $ do{name<-identifier <* comma
 					; brackets . many $ noneOf [']']
@@ -502,7 +497,7 @@ justP = do
 
 nothingP :: Parser (Maybe Integer)
 nothingP = do
-	symbol "Nothing"  --TODO : check
+	symbol "Nothing"
 	return Nothing
 
 
