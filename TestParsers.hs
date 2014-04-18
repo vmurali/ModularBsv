@@ -180,7 +180,7 @@ moduleParser = do
 	nameModule <- identifier
 	listInstancesAndFormalParameters <-  instancesParser
 	manyTill anyChar . try $ symbol "-- AP local definitions"	
-	listBindings <- lookAhead . many . try $ do{manyTill anyChar (lookAhead.try $ bindingParser);bindingParser}
+	listBindings <- lookAhead . many . try $ do{manyTill anyChar ((lookAhead $ symbol "-----") *> return undefined  <|> (lookAhead.try $ bindingParser));bindingParser}
 	manyTill anyChar . try $ symbol "-- AP rules"	
 	listRules<- many . try $ ruleParser
 	manyTill anyChar . try $ symbol "-- AP scheduling pragmas"	
