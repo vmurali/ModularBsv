@@ -56,7 +56,7 @@ data Expression = Renaming String
 	| Minus String String
 	| R3Shift String String
 	| L3Shift String String
-	deriving(Show,Eq)
+	deriving(Show,Eq,Ord)
 
 data Module = Module { name :: String
 	, instances :: [ Instance ]
@@ -66,24 +66,24 @@ data Module = Module { name :: String
 	, fps :: [ Fp ]
 	, conflictMatrix :: Map.Map (String, String) Conflict 
 	, priorityList :: [ [ String ] ]
-} deriving(Show,Eq)--Done
+} deriving(Show,Eq,Ord)--Done
 
-data Conflict =  C | CF | SB | SA deriving(Show,Eq)
+data Conflict =  C | CF | SB | SA deriving(Show,Eq,Ord)
 
 data Instance = Instance {instName :: String
 	, instModule :: String
 	, instArgs :: [ String ]
-} deriving(Show,Eq)--Done
+} deriving(Show,Eq,Ord)--Done
 
 data Binding = Binding {bindName :: String
 	, bindSize :: Integer 
 	, bindExpr :: Expression
-} deriving(Show,Eq)--Done
+} deriving(Show,Eq,Ord)--Done
 
 data Rule = Rule {ruleName :: String
 	, ruleGuard :: String 
 	, ruleBody :: [ MExpression ]
-} deriving(Show,Eq)--Done
+} deriving(Show,Eq,Ord)--Done
 
 
 data Method = Method {methodName :: String
@@ -91,19 +91,19 @@ data Method = Method {methodName :: String
 	, methodType :: TypeOfMethod  
 	, methodArgs :: [(String, Integer)]
 	, methodBody :: [ MExpression ]
-} deriving(Show,Eq) --Done
+} deriving(Show,Eq,Ord) --Done
 
 data Fp = Fp {fpName :: String
 	, fpType :: TypeOfMethod
 	, fpArgs :: [ (String,Integer) ]
-} deriving(Show,Eq)
+} deriving(Show,Eq,Ord)
 
 -- Unit operations in the body of a method.
 data MExpression = MExpression {calledCond :: Maybe String 
 	, calledModule :: String
 	, calledMethod :: String 
 	, calledArgs :: [ String ]
-} deriving(Show,Eq)--Done 
+} deriving(Show,Eq,Ord)--Done 
 
 
 --The integers are the size of the result
@@ -111,7 +111,7 @@ data TypeOfMethod = Value Integer
 	| Value0 Integer
 	| Action
 	| ActionValue Integer
-	deriving(Show,Eq)
+	deriving(Show,Eq,Ord)
 --
 --Lexer and Parsers of the ATS language 
 --
