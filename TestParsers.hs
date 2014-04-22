@@ -25,6 +25,7 @@ import qualified Text.ParserCombinators.Parsec.Token as P
 --AST of ATS
 
 data Expression = Renaming String
+	| SConst String
 	| And String String
 	| Or String String
 	| Not String
