@@ -26,8 +26,9 @@ type MethodSet = Set.Set Method
 
 --
 
-env :: Env
-env = Map.empty 
+
+buildEnv :: Module -> Env
+buildEnv m = List.foldl (\env b -> Map.insert (bindName b) b env) Map.empty $ bindings m
 
 methodCalledMExpr :: MExpression -> (String, String) 
 methodCalledMExpr expr = (calledModule expr, calledMethod expr)
@@ -70,9 +71,17 @@ expandBindingToString bind = case bindExpr bind of
 	 Extract a b c -> Set.fromList [a,b,c]
 	 MCall _ -> Set.empty
 	 Concat l -> Set.fromList l
-	 	
+
+
+--Usefull tool	 
+catMaybeOnSet :: Ord a => Set.Set (Maybe a) -> Set.Set a 
+catMaybeOnSet = Set.fromList . Maybe.catMaybes . Set.elems   
+--
+
+
+
 expandBinding :: Env -> Binding -> Set.Set Binding
-expandBinding env bind = Set.fromList . Maybe.catMaybes . Set.elems $ Set.map (\x -> Map.lookup x env) (expandBindingToString bind)
+expandBinding env bind = catMaybeOnSet $ Set.map (\x -> Map.lookup x env) (expandBindingToString bind)
 
 expandBindings :: Env -> Set.Set Binding -> Set.Set Binding 
 expandBindings env binds = (expandBinding env) =<< binds
@@ -80,5 +89,14 @@ expandBindings env binds = (expandBinding env) =<< binds
 
 expandUntilFp :: Env -> Set.Set Binding -> Set.Set Binding
 expandUntilFp env init = lfpFrom init (expandBindings env) 
+
+methodC :: Binding -> Maybe (String,String)
+methodC bind = case bindExpr bind of
+	MCall m -> Just (calledModule m, calledMethod m)
+	_ -> Nothing  
+
+methodsCalledInBinding :: Env -> Binding -> Set.Set (String,String)
+methodsCalledInBinding env bind = catMaybeOnSet . Set.map methodC . expandUntilFp env $ Set.singleton bind
+
 
 
