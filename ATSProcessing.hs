@@ -131,7 +131,11 @@ main = do
 	parse <- parseFromFile modulesParser "DumpProc.hs"
 	case parse of
 		Left _ -> undefined
-		Right lmodule -> let env = buildEnv . head . drop 8 $ lmodule in
-			 let monbindprefere = env Map.! "RDY_wr" in --"x__h3447" in
-				 print . show . methodsCalledByMethod env $ monbindprefere
+		Right lmodule -> let poulpe = head . drop 8 $ lmodule in  
+				 let env = buildEnv poulpe in
+				 print . show . methodsCalledByMethod env . head . drop 1 $ methods poulpe 
+			
+			--	 print . show $ methods poulpe 	
+			-- 	 let monbindprefere = env Map.! "RDY_wr" in --"x__h3447" in
+			--		 print . show . methodsCalledByMethod env $ monbindprefere
 
