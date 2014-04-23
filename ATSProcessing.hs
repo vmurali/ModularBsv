@@ -10,7 +10,7 @@ import qualified Data.Map as Map
 import qualified Data.String.Utils as S
 import qualified Data.Either as E
 import qualified Data.Set.Monad as Set
-import Algebra.Lattice --Haskell :3
+import Algebra.Lattice --Haskell <3
 import TestParsers
 import Text.Parsec hiding (token)
 import Text.Parsec.String
@@ -112,7 +112,7 @@ main = do
 	parse <- parseFromFile modulesParser "DumpProc.hs"
 	case parse of
 		Left _ -> undefined
-		Right lmodule -> let env = buildEnv . head . drop 2 $ lmodule in
-				 let monbindprefere = env Map.! "decode_inst_BITS_31_TO_26_EQ_0b10000_1_AND_NOT_ETC___d248" in
-				 print . show . expandUntilFp env $ Set.singleton monbindprefere
+		Right lmodule -> let env = buildEnv . head . drop 8 $ lmodule in
+			 let monbindprefere = env Map.! "RDY_wr" in --"x__h3447" in
+				 print . show . methodsCalledInBinding env $ monbindprefere
 
