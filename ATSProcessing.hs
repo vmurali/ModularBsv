@@ -36,8 +36,8 @@ buildEnv m = List.foldl (\env b -> Map.insert (bindName b) b env) Map.empty $ bi
 methodCalledMExpr :: MExpression -> (String, String) 
 methodCalledMExpr expr = (calledModule expr, calledMethod expr)
 
-methodsCalled :: Method -> [ (String, String) ]
-methodsCalled m = map methodCalledMExpr $ methodBody m
+methodsCalled :: Method -> Set.Set (String, String)
+methodsCalled m = Set.fromList . map methodCalledMExpr $ methodBody m
 
 expandBindingToString :: Binding -> Set.Set String
 expandBindingToString bind = Set.fromList $ (bindName bind : case bindExpr bind of
@@ -107,6 +107,25 @@ methodC bind = case bindExpr bind of
 methodsCalledInBinding :: Env -> Binding -> Set.Set (String,String)
 methodsCalledInBinding env bind = catMaybeOnSet . Set.map methodC . expandUntilFp env $ Set.singleton bind
 
+
+methodsCalledByMethod :: Env -> Method -> Set.Set (String, String)
+methodsCalledByMethod env meth = case methodType meth of
+	Value n -> methodsCalledInBinding env (env Map.! (methodName meth)) `Set.union` methodsCalledInBinding env (env Map.! ("RDY_" ++ methodName meth)) 
+	Value0 n -> methodsCalledInBinding env (env Map.! (methodName meth)) `Set.union` methodsCalledInBinding env (env Map.! ("RDY_" ++ methodName meth)) 
+	Action -> methodsCalledInBinding env (env Map.! ("RDY_" ++ methodName meth)) `Set.union`  methodsCalled meth 
+	ActionValue n -> methodsCalledInBinding env (env Map.! ("RDY_" ++ methodName meth)) `Set.union` 
+			methodsCalledInBinding env (env Map.! (methodName meth)) `Set.union`
+			methodsCalled meth 
+
+--
+--REVERSE THING : 
+--
+--a) the rule name or method name calling it
+--b) the if condition predicate name at that point
+--c) the arguments with which the method is called at that point
+--
+--
+
 main :: IO()
 main = do
 	parse <- parseFromFile modulesParser "DumpProc.hs"
@@ -114,5 +133,5 @@ main = do
 		Left _ -> undefined
 		Right lmodule -> let env = buildEnv . head . drop 8 $ lmodule in
 			 let monbindprefere = env Map.! "RDY_wr" in --"x__h3447" in
-				 print . show . methodsCalledInBinding env $ monbindprefere
+				 print . show . methodsCalledByMethod env $ monbindprefere
 
