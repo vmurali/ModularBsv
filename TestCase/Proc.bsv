@@ -100,7 +100,7 @@ typedef struct {
 
 // Defines the Processor module, with a synthesis boundary, ie a verilog file is created for this module
 (* synthesize *)
-module [Module] mkProc(Proc);
+module mkProc(Proc);
 
   //Instantiating all the state elements of the processor.
 
