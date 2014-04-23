@@ -98,11 +98,18 @@ typedef struct {
   Data data;
 } Mem2Wb deriving (Bits, Eq);
 
+(* synthesize *)
+module mkSb(Scoreboard#(16));
+  Scoreboard#(16) sb <- mkCFScoreboard;
+  return sb;
+endmodule
 // Defines the Processor module, with a synthesis boundary, ie a verilog file is created for this module
 (* synthesize *)
 module mkProc(Proc);
 
   //Instantiating all the state elements of the processor.
+
+  let sb <- mkSb;
 
   // Architectural State
   Reg#(Addr) pc <- mkRegU;
@@ -133,7 +140,6 @@ module mkProc(Proc);
   Reg#(Bool)  eEpoch <- mkReg(False);
 
   // Microarchitectural state associated with data hazards
-  Scoreboard#(16) sb <- mkCFScoreboard;
 
   Fifo#(1, Tuple2#(Maybe#(FullIndx), Data)) bypassFromExec <- mkBypassFifo;
   Fifo#(1, Tuple2#(Maybe#(FullIndx), Data))  bypassFromMem <- mkBypassFifo;
@@ -306,7 +312,15 @@ module mkProc(Proc);
     let epoch = d2rf.first.epoch;
     let dInst = d2rf.first.dInst;
 
-    let waw = sb.search3(dInst.dst);
+    let waw = False;
+
+    waw = sb.search3(pc == 0? dInst.dst : unpack (~ pack (dInst.dst)));
+/*
+    if(pc == 0)
+      waw = sb.search3(dInst.dst);
+    else
+      waw = sb.search3(unpack(~pack(dInst.dst)));
+*/
     let raw = isRawH(dInst.src1, sb.search1, bypassFromExec, bypassFromMem, bypassFromWb) || isRawH(dInst.src2, sb.search2, bypassFromExec, bypassFromMem, bypassFromWb);
 
     if(bypassFromExec.notEmpty)
@@ -391,6 +405,13 @@ module mkProc(Proc);
         dCache.req(MemReq{op: St, addr: addr, data: data});
       end
     end
+
+    if(pc == 0)
+      sb.insert(tagged Invalid);
+    else if (pc == 1)
+      sb.insert(tagged Valid FullIndx{regType: Normal, idx: 16});
+    else if (pc == 4)
+      sb.insert(tagged Valid FullIndx{regType: CopReg, idx: 23});
 
     m12m2.enq(ex2m.first);
     ex2m.deq;
