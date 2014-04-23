@@ -182,11 +182,11 @@ moduleParser = do
 	nameModule <- identifier
 	listInstancesAndFormalParameters <-  instancesParser
 	manyTill anyChar . try $ symbol "-- AP local definitions"	
-	listBindings <- lookAhead . many . try $ do{manyTill anyChar (((try.lookAhead $ symbol "-----") *> return undefined)  <|> (lookAhead.try $ bindingParser));bindingParser}
+	listBindings <- lookAhead . many . try $ do{manyTill anyChar (((try.lookAhead $ symbol "=== ATS") *> return undefined)  <|> (lookAhead.try $ bindingParser));bindingParser}
 	manyTill anyChar . try $ symbol "-- AP rules"	
 	listRules<- many . try $ ruleParser
 	manyTill anyChar . try $ symbol "-- AP scheduling pragmas"	
-	listMethods <- many . try $ do{manyTill anyChar ((try.lookAhead $ symbol "-----") *> return undefined <|> (try . lookAhead $ methodParser)); methodParser}  --Little bit Hacky TODO...
+	listMethods <- many . try $ do{manyTill anyChar ((try.lookAhead $ symbol "=== ATS") *> return undefined <|> (try . lookAhead $ methodParser)); methodParser}  --Little bit Hacky TODO...
 	let (inst,l) = E.partitionEithers listInstancesAndFormalParameters 
 	return $ Module{name=nameModule  --Test name
 			, instances = inst
@@ -220,7 +220,7 @@ instancesParser = do
 
 instanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 instanceParser = do
-	toTrash <- manyTill anyChar ((try . lookAhead $ (try . lookAhead $ symbol "-----") <|> do{test<- identifier
+	toTrash <- manyTill anyChar ((try . lookAhead $ (try . lookAhead $ symbol "=== ATS") <|> do{test<- identifier
 						; symbol "::" <* symbol "ABSTRACT"}))
 	nameInst <- identifier
 	symbol "::"
@@ -474,7 +474,7 @@ methodBodyParser = do
 
 bodyInstanceParser :: Parser (Either Instance ([Fp], Map.Map (String,String) Conflict))
 bodyInstanceParser = do
-	toTrash <-  manyTill anyChar . try $ ((try . lookAhead $ symbol "-----") <|>  (lookAhead $ identifier <* symbol "::" <* symbol "ABSTRACT"))
+	toTrash <-  manyTill anyChar . try $ ((try . lookAhead $ symbol "=== ATS") <|>  (lookAhead $ identifier <* symbol "::" <* symbol "ABSTRACT"))
 	symbol "fp" <* symbol "::" <* symbol "ABSTRACT:" <* (identifier `sepBy` dot) 
 	symbol "="
 	nameModule <-  identifier 
