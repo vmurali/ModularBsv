@@ -19,7 +19,7 @@ import Types::*;
 import ProcTypes::*;
 import Vector::*;
 
-(* noinline *)
+//(* noinline *)
 function Data alu(Data a, Data b, AluFunc func);
   Data res = case(func)
      Add   : (a + b);
@@ -37,7 +37,7 @@ function Data alu(Data a, Data b, AluFunc func);
   return res;
 endfunction
 
-(* noinline *)
+//(* noinline *)
 function Bool aluBr(Data a, Data b, BrFunc brFunc);
   Bool brTaken = case(brFunc)
     Eq  : (a == b);
@@ -52,7 +52,7 @@ function Bool aluBr(Data a, Data b, BrFunc brFunc);
   return brTaken;
 endfunction
 
-(* noinline *)
+//(* noinline *)
 function Addr brAddrCalc(Addr pc, Data val, IType iType, Data imm, Bool taken);
   Addr pcPlus4 = pc + 4; 
   Addr targetAddr = case (iType)
@@ -64,7 +64,7 @@ function Addr brAddrCalc(Addr pc, Data val, IType iType, Data imm, Bool taken);
   return targetAddr;
 endfunction
 
-(* noinline *)
+//(* noinline *)
 function ExecInst exec(DecodedInst dInst, Data rVal1, Data rVal2, Addr pc, Addr ppc, Data copVal);
   ExecInst eInst = ?;
   Data aluVal2 = isValid(dInst.imm) ? validValue(dInst.imm) : rVal2;

@@ -123,6 +123,14 @@ methodsCalledByMethod env meth = case methodType meth of
 			methodsCalledInBinding env (env Map.! (methodName meth)) `Set.union`
 			methodsCalled meth 
 
+type InstanceName = String
+type MethodName = String
+type RuleOrMethName = String
+type Condition = String
+type Argument = String
+methodsCalledRulesOrMethods :: Module -> Map RuleOrMethName {-->-} (Set.Set (InstanceName, MethodName))
+callerInformation :: Module -> Map (InstanceName, MethodName) {-->-} (Set.Set (Name, Condition, [Argument]))
+
 --
 --REVERSE THING : 
 --

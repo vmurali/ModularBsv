@@ -19,7 +19,7 @@ import Types::*;
 import ProcTypes::*;
 import Vector::*;
 
-(* noinline *)
+//(* noinline *)
 function DecodedInst decode(Data inst);
   DecodedInst dInst = ?;
   let opcode = inst[ 31 : 26 ];
