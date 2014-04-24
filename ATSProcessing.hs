@@ -38,9 +38,52 @@ type MethodSet = Set.Set Method
 --
 
 
-buildEnv :: Module -> Env
-buildEnv m = List.foldl (\env b -> Map.insert (bindName b) b env) Map.empty $ bindings m
+buildEnv :: Module -> Env --We add the constants inside the env : it's easier, they are like leafs of a tree.
+buildEnv m = List.foldl (\env bind -> addCstsInEnv bind env) (List.foldl (\env b -> Map.insert (bindName b) b env) Map.empty $ bindings m) $ bindings m
+	where addCstsInEnv bind env = List.foldl
+					(\locenv x -> if Map.member x locenv then locenv else Map.insert (x) 
+													 (Binding {bindName = x
+														, bindSize = 0 
+														, bindExpr = SConst x}) 
+													 locenv)
+					env $
+					case bindExpr bind of
+						SConst a -> []
+						Sext a ->  [a]
+						Not a -> [a]
+						BNot a ->  [a]
+						Renaming a -> [a]
+						Plus a b ->  [a,b]
+						Times a b ->  [a,b]
+						Divide a b ->  [a,b]
+						Modulus a b ->  [a,b]
+						Lt a b ->  [a,b]
+						Gt a b  ->  [a,b]
+						LtEq a b ->  [a,b]
+						GtEq a b  ->  [a,b]
+						ULt a b ->  [a,b]
+						UGt a b ->  [a,b]
+						PrimArrayDynSelect a b ->  [a,b]
+						ULtEq a b ->  [a,b]
+						UGtEq a b  ->  [a,b]
+						BAnd a b ->  [a,b]
+						BOr a b ->  [a,b]
+						RShift a b  ->  [a,b]
+						LShift a b ->  [a,b]
+						BXor a b ->  [a,b]
+						NotEqual a b ->  [a,b]
+						Minus a b ->  [a,b]
+						Equal a b ->  [a,b]
+						R3Shift a b ->  [a,b]
+						L3Shift a b ->  [a,b]
+					 	Or a b ->  [a,b]
+						And a b ->  [a,b]
+						Mux a b c ->  [a,b,c]
+						Extract a b c ->  [a,b,c]
+						MCall _ -> []
+						Concat l ->  l
 
+				 
 methodCalledMExpr :: Env -> MExpression -> Set.Set (String, String)   --I add all the methods called inside the if binding
 methodCalledMExpr env expr = case calledCond expr of
 	Nothing -> Set.singleton (calledModule expr, calledMethod expr)
@@ -201,7 +244,7 @@ extractCondFromBind :: Env -> (String, String) -> Set.Set String -> Binding ->  
 extractCondFromBind env names path bind = case bindExpr bind of
 	 MCall m -> if names == (calledModule m, calledMethod m) then path else Set.empty
 	 Mux a b c -> Set.unions . map (extractCondFromBind env names (Set.insert a path)) $ [ env Map.! b, env Map.! c]
-	 _ -> Set.unions . map ((extractCondFromBind env names path) . (env Map.!))$ case bindExpr bind of 
+	 _ -> Set.unions . map ((extractCondFromBind env names path) . ((env Map.!)))$ case bindExpr bind of 
 		 SConst a -> []
 		 Sext a ->  [a]
 		 Not a -> [a]
@@ -238,9 +281,9 @@ extractCondFromBind env names path bind = case bindExpr bind of
 
 argsMethodCallInsideMethod :: Env -> (String, String) -> Method -> [[ String ]] -- The list contains at most one sublist
 argsMethodCallInsideMethod env names meth =  (concat . map (argsMethodCallInsideMExpr env names) $ methodBody meth) ++ --Perhaps inside the body
-	(argsMethodCallInsideBinding env names $ env Map.! ("RDY_" ++ methodName meth)) ++  --Perhaps It's called inside the ready statement
+	(argsMethodCallInsideBinding env names  $ env Map.! ("RDY_" ++ methodName meth)) ++  --Perhaps It's called inside the ready statement
  	case methodType meth of  -- Or inside the result
-		Value n -> argsMethodCallInsideBinding env names $ env Map.! methodName meth
+		Value n -> argsMethodCallInsideBinding env names  $ env Map.! methodName meth
 		Value0 n -> argsMethodCallInsideBinding env names $ env Map.! methodName meth
 		Action -> []
 		ActionValue n -> argsMethodCallInsideBinding env names $ env Map.! methodName meth
@@ -256,41 +299,41 @@ argsMethodCallInsideMExpr env names expr = (if (calledModule expr,calledMethod e
 argsMethodCallInsideBinding :: Env -> (String, String) -> Binding -> [[ String ]]
 argsMethodCallInsideBinding env (nMod,nMet) bind = case (bindExpr bind) of
 	MCall m -> if (calledModule m,calledMethod m) == (nMod, nMet) then [ calledArgs m ] else []
-	_ -> concat . map (argsMethodCallInsideBinding env (nMod,nMet) . (env Map.!)) $
+	_ -> concat . map (argsMethodCallInsideBinding env (nMod,nMet) . ( env Map.!)) $
 		case bindExpr bind of 
 			SConst a -> []
-			Sext a ->  [a]
-			Not a -> [a]
-			BNot a ->  [a]
+			Sext a -> [ a]
+			Not a -> [ a]
+			BNot a -> [ a]
 			Renaming a -> [a]
-			Plus a b ->  [a,b]
-			Times a b ->  [a,b]
-			Divide a b ->  [a,b]
-			Modulus a b ->  [a,b]
-			Lt a b ->  [a,b]
-			Gt a b  ->  [a,b]
-			LtEq a b ->  [a,b]
-			GtEq a b  ->  [a,b]
-			ULt a b ->  [a,b]
-			UGt a b ->  [a,b]
-			PrimArrayDynSelect a b ->  [a,b]
-			ULtEq a b ->  [a,b]
-			UGtEq a b  ->  [a,b]
-			BAnd a b ->  [a,b]
-			BOr a b ->  [a,b]
-			RShift a b  ->  [a,b]
-			LShift a b ->  [a,b]
-			BXor a b ->  [a,b]
-			NotEqual a b ->  [a,b]
-			Minus a b ->  [a,b]
-			Equal a b ->  [a,b]
-			R3Shift a b ->  [a,b]
-			L3Shift a b ->  [a,b]
- 			Or a b ->  [a,b]
-			And a b ->  [a,b]
-			Mux a b c ->  [a,b,c]
-			Extract a b c ->  [a,b,c]
-	 		Concat l ->  l
+			Plus a b -> [ a,b]
+			Times a b -> [ a,b]
+			Divide a b -> [ a,b]
+			Modulus a b -> [ a,b]
+			Lt a b -> [ a,b]
+			Gt a b  -> [ a,b]
+			LtEq a b -> [ a,b]
+			GtEq a b  -> [ a,b]
+			ULt a b -> [ a,b]
+			UGt a b -> [ a,b]
+			PrimArrayDynSelect a b -> [ a,b]
+			ULtEq a b -> [ a,b]
+			UGtEq a b  -> [ a,b]
+			BAnd a b -> [ a,b]
+			BOr a b -> [ a,b]
+			RShift a b  -> [ a,b]
+			LShift a b -> [ a,b]
+			BXor a b -> [ a,b]
+			NotEqual a b -> [ a,b]
+			Minus a b -> [ a,b]
+			Equal a b -> [ a,b]
+			R3Shift a b -> [ a,b]
+			L3Shift a b -> [ a,b]
+ 			Or a b -> [ a,b]
+			And a b -> [ a,b]
+			Mux a b c -> [ a,b,c]
+			Extract a b c -> [ a,b,c]
+	 		Concat l -> l
 
 
 
@@ -301,7 +344,10 @@ main = do
 		Left _ -> undefined
 		Right lmodule -> let poulpe = head . drop 8 $ lmodule in  
 				 let env = buildEnv poulpe in
-				 print . show . methodsCalledByMethod env . head . drop 1 $ methods poulpe 
+				 print . show . callerInformation poulpe env $ ("copFifo_enqEn_dummy2_0","read") 
+			
+
+			-- methodsCalledByMethod env . head . drop 1 $ methods poulpe 
 			
 			--	 print . show $ methods poulpe 	
 			-- 	 let monbindprefere = env Map.! "RDY_wr" in --"x__h3447" in
