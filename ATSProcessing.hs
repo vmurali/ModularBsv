@@ -28,6 +28,12 @@ type Env = Map.Map String Binding
 type MethodSet = Set.Set Method 
 
 --
+--
+--TODO TODO
+--TODO TODO
+--
+--ADD THE SUPPORT OF THE RULES -> Normally it's easy.
+--
 
 
 buildEnv :: Module -> Env
@@ -125,6 +131,42 @@ methodsCalledByMethod env meth = case methodType meth of
 --c) the arguments with which the method is called at that point
 --
 --
+
+--Two cases for a ) 
+--   - the method called is called in the body of a rule/method -> Easy to have the caller.
+--   - the method called is called under a ton of bindings -> We have to fold the bindings until a bindname match with a methodname. 
+--   		-> Is it correct? Any distinction between different types of methods?
+--
+--b) What do you mean? The last if statement conditionning that trigger this call?
+--
+--
+--
+--TODO RULES
+--
+
+giveMeAllTheArgumentOfThisMethod = (String, String) -> Module -> [[ String ]]
+giveMeAllTheArgumentOfThisMethod names mod = argsMethodCallInsideMethods names (methods mod) ++ argsMethodCallInsideBindings names (bindings mod)
+
+
+argsMethodCallInsideMethods :: (String, String) -> [ Method ] -> [[ String ]]
+argsMethodCallInsideMethods name l = catMaybes . map (\x -> argsMethodCallInsideBody name x) $ l   --Yep we could use mapMaybes TODO
+
+argsMethodCallInsideBindings :: (String, String) -> [ Binding ] -> [[ String ]]
+argsMethodCallInsideBindings name l = catMaybes . map (\x -> argsMethodCallInsideBinding name x) $ l   --Yep we could use mapMaybes TODO
+
+argsMethodCallInsideBody :: (String, String) -> Method -> [[ String ]]
+argsMethodCallInsideBody name meth = catMaybes . map (\x -> argsMethodCallInsideMExpr name x) $ methodBody meth
+
+argsMethodCallInsideBinding :: (String, String) -> Binding -> Maybe ([ String ])
+argsMethodCallInsideBinding (nameMod, nameMet) bind = case bindExpr bind of
+		MCall l -> if calledModule l == nameMod && calledMethod l == nameMet then Just $ calledArgs l else Nothing
+		_ -> Nothing 	
+
+ 
+argsMethodCallInsideMExpr :: (String, String) -> MExpression -> Maybe ([ String ])
+argsMethodCallInsideMExpr 
+
+
 
 main :: IO()
 main = do
