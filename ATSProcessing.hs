@@ -63,7 +63,8 @@ buildEnv m = List.foldl (\env bind -> addCstsInEnv bind env) (List.foldl (\env b
 						GtEq a b  ->  [a,b]
 						ULt a b ->  [a,b]
 						UGt a b ->  [a,b]
-						PrimArrayDynSelect a b ->  [a,b]
+						PrimBuildArray l -> l
+						PrimArrayDynSelect a b -> [a,b]
 						ULtEq a b ->  [a,b]
 						UGtEq a b  ->  [a,b]
 						BAnd a b ->  [a,b]
@@ -110,7 +111,8 @@ expandBindingToString bind = Set.fromList $ (bindName bind : case bindExpr bind 
 	 GtEq a b  ->  [a,b]
 	 ULt a b ->  [a,b]
 	 UGt a b ->  [a,b]
-	 PrimArrayDynSelect a b ->  [a,b]
+	 PrimBuildArray l -> l
+	 PrimArrayDynSelect a b -> [a,b]
 	 ULtEq a b ->  [a,b]
 	 UGtEq a b  ->  [a,b]
 	 BAnd a b ->  [a,b]
@@ -225,7 +227,7 @@ callerInformation mod env names =
 									[] -> Just (methodName method, Nothing, a)
 									[b] -> Just (methodName method, Just b, a) 
 									_ -> trace "False assumption l 182" $ undefined 
-							_ -> undefined ) $ methods mod
+							_ -> trace (show called ++ show method) $undefined ) $ methods mod
 
 catchTheCond :: Env -> (String, String) -> Method -> [String]
 catchTheCond env names method = (Maybe.catMaybes . map (extractCondFromMExpr env names) $ methodBody method)
@@ -260,7 +262,8 @@ extractCondFromBind env names path bind = case bindExpr bind of
 		 GtEq a b  ->  [a,b]
 		 ULt a b ->  [a,b]
 		 UGt a b ->  [a,b]
-		 PrimArrayDynSelect a b ->  [a,b]
+		 PrimArrayDynSelect a b -> [a,b]
+		 PrimBuildArray l -> l
 		 ULtEq a b ->  [a,b]
 		 UGtEq a b  ->  [a,b]
 		 BAnd a b ->  [a,b]
@@ -279,14 +282,15 @@ extractCondFromBind env names path bind = case bindExpr bind of
 		 Concat l ->  l
 	   
 
-argsMethodCallInsideMethod :: Env -> (String, String) -> Method -> [[ String ]] -- The list contains at most one sublist
-argsMethodCallInsideMethod env names meth =  (concat . map (argsMethodCallInsideMExpr env names) $ methodBody meth) ++ --Perhaps inside the body
+argsMethodCallInsideMethod :: Env -> (String, String) -> Method -> [[ String ]] -- The list contains at most one sublist we can have some empty list so nub!
+argsMethodCallInsideMethod env names meth = 
+	List.nub ((concat . map (argsMethodCallInsideMExpr env names) $ methodBody meth) ++ --Perhaps inside the body
 	(argsMethodCallInsideBinding env names  $ env Map.! ("RDY_" ++ methodName meth)) ++  --Perhaps It's called inside the ready statement
  	case methodType meth of  -- Or inside the result
 		Value n -> argsMethodCallInsideBinding env names  $ env Map.! methodName meth
 		Value0 n -> argsMethodCallInsideBinding env names $ env Map.! methodName meth
 		Action -> []
-		ActionValue n -> argsMethodCallInsideBinding env names $ env Map.! methodName meth
+		ActionValue n -> argsMethodCallInsideBinding env names $ env Map.! methodName meth)
 
 
 argsMethodCallInsideMExpr :: Env -> (String, String) -> MExpression -> [[ String ]]
@@ -302,37 +306,38 @@ argsMethodCallInsideBinding env (nMod,nMet) bind = case (bindExpr bind) of
 	_ -> concat . map (argsMethodCallInsideBinding env (nMod,nMet) . ( env Map.!)) $
 		case bindExpr bind of 
 			SConst a -> []
-			Sext a -> [ a]
-			Not a -> [ a]
-			BNot a -> [ a]
+			Sext a -> [a]
+			Not a -> [a]
+			BNot a -> [a]
 			Renaming a -> [a]
-			Plus a b -> [ a,b]
-			Times a b -> [ a,b]
-			Divide a b -> [ a,b]
-			Modulus a b -> [ a,b]
-			Lt a b -> [ a,b]
-			Gt a b  -> [ a,b]
-			LtEq a b -> [ a,b]
-			GtEq a b  -> [ a,b]
-			ULt a b -> [ a,b]
-			UGt a b -> [ a,b]
-			PrimArrayDynSelect a b -> [ a,b]
-			ULtEq a b -> [ a,b]
-			UGtEq a b  -> [ a,b]
-			BAnd a b -> [ a,b]
-			BOr a b -> [ a,b]
-			RShift a b  -> [ a,b]
-			LShift a b -> [ a,b]
-			BXor a b -> [ a,b]
-			NotEqual a b -> [ a,b]
-			Minus a b -> [ a,b]
-			Equal a b -> [ a,b]
-			R3Shift a b -> [ a,b]
-			L3Shift a b -> [ a,b]
- 			Or a b -> [ a,b]
-			And a b -> [ a,b]
-			Mux a b c -> [ a,b,c]
-			Extract a b c -> [ a,b,c]
+			Plus a b -> [a,b]
+			Times a b -> [a,b]
+			Divide a b -> [a,b]
+			Modulus a b -> [a,b]
+			Lt a b -> [a,b]
+			Gt a b  -> [a,b]
+			LtEq a b -> [a,b]
+			GtEq a b  -> [a,b]
+			ULt a b -> [a,b]
+			UGt a b -> [a,b]
+			PrimBuildArray l -> l
+			PrimArrayDynSelect a b-> [a,b]
+			ULtEq a b -> [a,b]
+			UGtEq a b  -> [a,b]
+			BAnd a b -> [a,b]
+			BOr a b -> [a,b]
+			RShift a b  -> [a,b]
+			LShift a b -> [a,b]
+			BXor a b ->  [a,b]
+			NotEqual a b -> [a,b]
+			Minus a b -> [a,b]
+			Equal a b -> [a,b]
+			R3Shift a b -> [a,b]
+			L3Shift a b -> [a,b]
+ 			Or a b -> [a,b]
+			And a b -> [a,b]
+			Mux a b c -> [a,b,c]
+			Extract a b c -> [a,b,c]
 	 		Concat l -> l
 
 
@@ -341,11 +346,12 @@ main :: IO()
 main = do
 	parse <- parseFromFile modulesParser "DumpProc.hs"
 	case parse of
-		Left _ -> undefined
+		Left _ -> trace "test" $ undefined
 		Right lmodule -> let poulpe = head . drop 8 $ lmodule in  
 				 let env = buildEnv poulpe in
-				 print . show . callerInformation poulpe env $ ("copFifo_enqEn_dummy2_0","read") 
-			
+			--	 print . show $ env
+				 print . show . callerInformation poulpe env $ ("copFifo_deqP_dummy2_1","read") 
+		--		 print. show $ poulpe			
 
 			-- methodsCalledByMethod env . head . drop 1 $ methods poulpe 
 			

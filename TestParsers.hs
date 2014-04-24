@@ -48,6 +48,7 @@ data Expression = Renaming String
 	| GtEq String String 
 	| ULt String String
 	| UGt String String
+	| PrimBuildArray [String]
 	| PrimArrayDynSelect String String 
 	| ULtEq String String
 	| UGtEq String String 
@@ -250,7 +251,7 @@ bindingParser :: Parser Binding
 bindingParser = do
 --We parse the first line
 	name <- identifier 
-	symbol "::" <* symbol "Bit"
+	symbol "::" <* ((try (symbol "Array" <* identifier <* symbol "Bit")) <|> symbol "Bit")
 	size <- integer <* semi              
 --We parse the second line with the same name
 	symbol name <* symbol "="
@@ -338,10 +339,13 @@ unaryParser =
               , k "!" $ do{first <- identifier ; return  $ Not first} 
 	      , k "~" $ do{first<- identifier ; return $ BNot first}
 	      , k "sext" $ do{first <- identifier; return $ Sext first}
-	      , k "PrimArrayDynSelect" $ do{first<- identifier; second <- identifier
-					; return $ PrimArrayDynSelect first second} ] <* semi         --WHAT IS IT? TODO
+	      , k "PrimBuildArray" $ do{first<- many1 identifier; 
+					; return $ PrimBuildArray first}
+	      , k "PrimArrayDynSelect" $ do{first <- identifier;
+					; second <- identifier;
+					return $ PrimArrayDynSelect first second} ] <* semi         --WHAT IS IT? TODO
   where
-    k x p = (symbol x) *> p   
+    k x p = try $ (symbol x) *> p   
 
 
 --
@@ -391,15 +395,15 @@ methodCallParser = do
 data ResultOrArg = Result | Arg deriving(Show,Eq)
 
 typeMethodParser :: Parser Bool
-typeMethodParser = 
+typeMethodParser =  --FUCKING ORDER ! ACTIONVALUE PREFIX ACTION 
 	 (try (symbol "AIDef") *> return True) <|>
+	 (try (symbol "AIActionValue") *> return True) <|>
 	 (try (symbol "AIAction") *> return False) <|>
-	 (try (symbol "AIActionValue") *> return False) <|>
 	 ((symbol "AIValue") *> return True)
 
 
 methodParser :: Parser Method
-methodParser = do  --USE THE COMMENTS
+methodParser = do  --TODO : USE THE COMMENTS TRY TO CHANGE THAT?
 	isValue <- symbol "--" *> typeMethodParser
 	nameM <- identifier
 	listArgs <- many $  (try resultParser) <|> try argMethodParser
