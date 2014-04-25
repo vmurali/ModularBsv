@@ -270,6 +270,11 @@ extractCondFromMExpr env (nMod, nMet) expr =
 								else Set.empty ) $ calledArgs expr 
 		Just a ->  if (nMod, nMet) == (calledModule expr ,calledMethod expr) then Set.singleton a else Set.empty
 
+--TODO
+--TODO    I have to add the good condition!
+--TODO
+--TODO
+
  
 extractCondFromBind :: Env -> (String, String) -> Set.Set String -> Binding ->  Set.Set String   --Fucking greedy. 
 extractCondFromBind env names path bind = case bindExpr bind of
