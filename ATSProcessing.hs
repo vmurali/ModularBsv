@@ -86,13 +86,20 @@ buildEnv m = List.foldl (\env bind -> addCstsInEnv bind env) (List.foldl (\env b
 
 				 
 methodCalledMExpr :: Env -> MExpression -> Set.Set (String, String)   --I add all the methods called inside the if binding
-methodCalledMExpr env expr = case calledCond expr of
-	Nothing -> Set.singleton (calledModule expr, calledMethod expr)
-	Just a ->  Set.singleton (calledModule expr, calledMethod expr) `Set.union` methodsCalledInBinding env (env Map.! a) 
+methodCalledMExpr env expr = (Set.unions . map (\namearg -> if Map.member namearg env 
+								then methodsCalledInBinding env (env Map.! namearg)
+								else Set.empty ) $ calledArgs expr )                                 --I handle the hardcoded arguments	
+	`Set.union` case calledCond expr of													-- Not very safe TODO better solution
+		Nothing -> Set.singleton (calledModule expr, calledMethod expr)
+		Just a ->  Set.singleton (calledModule expr, calledMethod expr) `Set.union` methodsCalledInBinding env (env Map.! a) 
 
 
 methodsCalled :: Env -> Method -> Set.Set (String, String)
 methodsCalled env m = Set.unions . map (methodCalledMExpr env) $ methodBody m
+
+
+methodsCalledR :: Env -> Rule -> Set.Set (String, String)
+methodsCalledR env m = Set.unions . map (methodCalledMExpr env) $ ruleBody m
 
 expandBindingToString :: Binding -> Set.Set String
 expandBindingToString bind = Set.fromList $ (bindName bind : case bindExpr bind of
@@ -163,6 +170,10 @@ methodC bind = case bindExpr bind of
 methodsCalledInBinding :: Env -> Binding -> Set.Set (String,String)
 methodsCalledInBinding env bind = catMaybeOnSet . Set.map methodC . expandUntilFp env $ Set.singleton bind
 
+methodsCalledByRule :: Env -> Rule -> Set.Set (String, String)
+methodsCalledByRule env rule = methodsCalledInBinding env (env Map.! (ruleGuard rule)) `Set.union`  methodsCalledR env rule 
+
+
 
 methodsCalledByMethod :: Env -> Method -> Set.Set (String, String)
 methodsCalledByMethod env meth = case methodType meth of
@@ -219,7 +230,17 @@ methodsCalledByMethod env meth = case methodType meth of
 
 callerInformation :: Module -> Env -> (String, String) -> [ (String, Maybe String, [String])] --Why the Set datastructure? Perf? Think about that. TODO
 callerInformation mod env names = 
-	Maybe.catMaybes . map (\method -> let called = argsMethodCallInsideMethod env names method in
+	(Maybe.catMaybes . map (\rule -> let called = argsMethodCallInsideRule env names rule in
+						case called of 
+							[] -> Nothing
+							[a]-> let theCond = catchTheCondR env names rule in 
+								case theCond of
+									[] -> Just (ruleName rule, Nothing, a)
+									[b] -> Just (ruleName rule, Just b, a)
+									_ -> trace "False assumption" $ undefined
+							_ -> trace ("ERROR 237:") $ undefined) $ rules mod)
+
+	++ (Maybe.catMaybes . map (\method -> let called = argsMethodCallInsideMethod env names method in
 						case called of
 							[] -> Nothing
 							[a] ->let theCond = catchTheCond env names method in
@@ -227,19 +248,27 @@ callerInformation mod env names =
 									[] -> Just (methodName method, Nothing, a)
 									[b] -> Just (methodName method, Just b, a) 
 									_ -> trace "False assumption l 182" $ undefined 
-							_ -> trace (show called ++ show method) $undefined ) $ methods mod
+							_ -> trace ("ERROR ATS247:" ++ show called ++ show method) $undefined ) $ methods mod)
 
 catchTheCond :: Env -> (String, String) -> Method -> [String]
-catchTheCond env names method = (Maybe.catMaybes . map (extractCondFromMExpr env names) $ methodBody method)
+catchTheCond env names method = (Set.elems . Set.unions . map (extractCondFromMExpr env names) $ methodBody method)
 						++ Set.elems (extractCondFromBind env names (Set.empty) (env Map.! ("RDY_" ++ methodName method)))
 						++ case methodType method of
 							Action -> []
 							_ -> Set.elems (extractCondFromBind env names (Set.empty) (env Map.! methodName method))
 
-extractCondFromMExpr :: Env -> (String, String) -> MExpression ->  Maybe String  --I assume our hypothesis here. BIG ISSUE if it's false.
-extractCondFromMExpr env (nMod, nMet) expr = case calledCond expr of
-	Nothing -> Nothing
-	Just a ->  if (nMod, nMet) == (calledModule expr ,calledMethod expr) then Just a else Nothing
+catchTheCondR :: Env -> (String, String) -> Rule -> [String]
+catchTheCondR env names rule = (Set.elems . Set.unions . map (extractCondFromMExpr env names) $ ruleBody rule)
+						++ Set.elems (extractCondFromBind env names (Set.empty) (env Map.! (ruleGuard rule)))
+
+extractCondFromMExpr :: Env -> (String, String) -> MExpression ->  Set.Set String  --I assume our hypothesis here. BIG ISSUE if it's false.
+extractCondFromMExpr env (nMod, nMet) expr = 
+	--HERE1
+	case calledCond expr of --TODO the same that in the direct sense, search a better solution
+		Nothing -> Set.unions . map (\namearg -> if Map.member namearg env 
+								then extractCondFromBind env (nMod, nMet) (Set.empty) (env Map.! namearg)
+								else Set.empty ) $ calledArgs expr 
+		Just a ->  if (nMod, nMet) == (calledModule expr ,calledMethod expr) then Set.singleton a else Set.empty
 
  
 extractCondFromBind :: Env -> (String, String) -> Set.Set String -> Binding ->  Set.Set String   --Fucking greedy. 
@@ -292,10 +321,20 @@ argsMethodCallInsideMethod env names meth =
 		Action -> []
 		ActionValue n -> argsMethodCallInsideBinding env names $ env Map.! methodName meth)
 
+argsMethodCallInsideRule :: Env -> (String, String) -> Rule -> [[ String ]] -- The list contains at most one sublist we can have some empty list so nub!
+argsMethodCallInsideRule env names rule = 
+	List.nub ((concat . map (argsMethodCallInsideMExpr env names) $ ruleBody rule) ++ --Perhaps inside the body
+	(argsMethodCallInsideBinding env names  $ env Map.! (ruleGuard rule)))  --Perhaps It's called inside the ready statement
 
-argsMethodCallInsideMExpr :: Env -> (String, String) -> MExpression -> [[ String ]]
-argsMethodCallInsideMExpr env names expr = (if (calledModule expr,calledMethod expr) == names then [calledArgs expr] else []) ++ 
- 	case calledCond expr of
+
+
+argsMethodCallInsideMExpr :: Env -> (String, String) -> MExpression -> [[ String ]] --TODO CHECK MY ASSUMPTIONS
+argsMethodCallInsideMExpr env names expr = (if (calledModule expr,calledMethod expr) == names then [calledArgs expr]    --HERE WE AVOID NESTED CALLS OF THE SAME FUNCTION
+											      else concat . map (\namearg -> if Map.member namearg env 
+								then argsMethodCallInsideBinding env names (env Map.! namearg)
+								else []) $ calledArgs expr ) ++                  
+--TODO SAME POINT SEARCH A BETTER SOLUTION 
+	case calledCond expr of
 		Nothing -> []
 		Just a -> argsMethodCallInsideBinding env names (env Map.! a)
 
@@ -350,11 +389,12 @@ main = do
 		Right lmodule -> let poulpe = head . drop 8 $ lmodule in  
 				 let env = buildEnv poulpe in
 			--	 print . show $ env
-				 print . show . callerInformation poulpe env $ ("copFifo_deqP_dummy2_1","read") 
 		--		 print. show $ poulpe			
-
-			-- methodsCalledByMethod env . head . drop 1 $ methods poulpe 
-			
+				 do{
+				 ; print . show . callerInformation poulpe env $ ("copFifo_deqP_lat_2","wget") 
+			 	 ; print . show . methodsCalledByRule env . head . drop 1 $ rules poulpe
+				 ; print . show . callerInformation poulpe env $ ("copFifo_deqP_rl","write")}
+				 	
 			--	 print . show $ methods poulpe 	
 			-- 	 let monbindprefere = env Map.! "RDY_wr" in --"x__h3447" in
 			--		 print . show . methodsCalledByMethod env $ monbindprefere
