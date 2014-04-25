@@ -37,6 +37,50 @@ type MethodSet = Set.Set Method
 --ADD THE SUPPORT OF THE RULES -> Normally it's easy.
 --
 
+ehrList = [0..5]
+
+ehr :: Module
+ehr = Module
+	{ name = "Ehr"
+	, instances = []
+	, bindings = []
+	, rules = []
+	, methods = (map (\x -> ehrRead{methodName = methodName ehrRead ++ show x}) ehrList) ++
+	            (map (\x -> ehrWrite{methodName = methodName ehrWrite ++ show x}) ehrList)
+	, fps = []
+	, conflictMatrix = constructCf "w" "r" SA
+				(constructCf "r" "w" SB
+					(constructCf "w" "w" C
+						(constructCf "r" "r" CF Map.empty)))
+	, priorityList = []
+	}
+
+constructCf :: String -> String -> Conflict -> Map.Map (String, String) Conflict -> Map.Map (String, String) Conflict
+constructCf arg1 arg2 c  m = foldl (\x y -> foldl (\x1 y1 -> Map.insert (arg1 ++ show y, arg2 ++ show y1)
+	  					(if y < y1
+							then SB
+							else if y == y1
+								then c
+								else SA)
+						x1) x ehrList) m ehrList
+
+ehrRead :: Method
+ehrRead = Method
+	{ methodName = "r"
+	, methodGuard = "1'b1"
+	, methodType = Value0 0
+	, methodArgs = []
+	, methodBody = []
+	}
+
+ehrWrite :: Method
+ehrWrite = Method
+	{ methodName = "w"
+	, methodGuard = "1'b1"
+	, methodType = Action
+	, methodArgs = [("x", 0)]
+	, methodBody = []
+	}
 
 buildEnv :: Module -> Env --We add the constants inside the env : it's easier, they are like leafs of a tree.
 buildEnv m = List.foldl (\env bind -> addCstsInEnv bind env) (List.foldl (\env b -> Map.insert (bindName b) b env) Map.empty $ bindings m) $ bindings m
