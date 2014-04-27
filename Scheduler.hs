@@ -11,7 +11,7 @@ import qualified Data.String.Utils as S
 import qualified Data.Either as E
 import qualified Data.Set.Monad as Set
 
-import Algebra.Lattice  --TOOOO COOOL
+import Algebra.Lattice  --SOOOO COOOL
 
 import TestParsers
 import Debug.Trace
@@ -46,7 +46,7 @@ instance JoinSemiLattice (Conflict) where
 -- I put the domains, the calles, the conflict matrix, the mapping of parameters to have the final conflict matrix
 calcConflict :: Set.Set String -> Set.Set String -> Set.Set String -> (String -> Set.Set (String, String)) -> Map.Map ((String, String), (String, String)) Conflict -> Map.Map String String -> Map.Map (String,String) Conflict
 calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simplify this things!
-	let union = Set.unions [rs, ms, fps] in
+	let union = Set.unions [rs, ms, realFp fps] in
 		Set.fold 	
 			(\arg1 acc1 -> Set.fold 
 					(\arg2 acc2 -> Map.insert (arg1, arg2) (conflict arg1 arg2) acc2)
@@ -64,4 +64,9 @@ calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simp
 						(Set.singleton CF)
 						callesx
 		liftThisSet = joins1 . Set.elems
+		realFp set = Set.map (\x->mapFormalReal Map.! x) set
+
+
+scheduler :: Set.Set String -> Set.Set String -> Set.Set String -> [[ String ]] -> Map.Map (String, String) Conflict -> Map.Map String Bool -> Map.Map String Bool
+
 						
