@@ -66,7 +66,35 @@ calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simp
 		liftThisSet = joins1 . Set.elems
 		realFp set = Set.map (\x->mapFormalReal Map.! x) set
 
+--TODO : Perhaps a structure of Map.Map String Bool is less efficient than a Set.Set String containing the scheduled methods.
 
-scheduler :: Set.Set String -> Set.Set String -> Set.Set String -> [[ String ]] -> Map.Map (String, String) Conflict -> Map.Map String Bool -> Map.Map String Bool
+--
+--CORE of the scheduler
+--
 
-						
+
+scheduler :: Set.Set String -> [[ String ]] -> Map.Map (String, String) Conflict -> Set.Set String -> Map.Map String Bool
+scheduler allMsFpsRs priorityList confMatrix methodsEnabled = fst $ List.foldl
+		(\acc1 elem -> List.foldl
+					(\(acc2, mySet) x -> if Set.member x mySet 
+								then (Map.insert x True acc2, updateThePossibilities mySet x confMatrix)
+								else (acc2, mySet))
+					acc1
+					elem)
+		(Map.empty, myInitSet)              --A kind of state monad, inline.
+		priorityList
+	where myInitSet = Set.fold (\elem acc -> updateThePossibilities acc elem confMatrix) allMsFpsRs methodsEnabled
+
+
+
+updateThePossibilities :: Set.Set String -> String -> Map.Map (String,String) Conflict -> Set.Set String
+updateThePossibilities possibilities nextMethod conflicts = Set.filter
+		(\x -> case conflicts Map.! (nextMethod,x) of
+				C -> False
+				SA -> False
+				SB -> True 
+				CF -> True)
+		possibilities
+
+
+
