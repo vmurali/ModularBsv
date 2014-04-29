@@ -81,14 +81,14 @@ data BoolExpr =  ETrue
 
 
 -- In the scheduler, I distinguish the static case of the dyna;ic case -> it's a small optimization.
-scheduler :: Set.Set String -> Set.Set String -> Set.Set String -> [[ String ]] -> Map.Map (String, String) Conflict -> Map.Map String BoolExpr -> Map.Map String BoolExpr
-scheduler ms rs fps priorityList confMatrix methodsEnabled = (\(x,y,z,t,u)->x) $ List.foldl
+scheduler :: Set.Set String -> Set.Set String -> Set.Set String -> [[ String ]] -> Map.Map (String, String) Conflict ->  Map.Map String BoolExpr
+scheduler ms rs fps priorityList confMatrix = (\(x,y,z,t,u)->x) $ List.foldl
 		(\acc1 elem -> List.foldl
 					(\(acc2, beforeMethods,beforeFp, beforeR, afterMethods) x ->
-						if Map.member x methodsEnabled then  --A method
+						if Set.member x ms then  --A method
 							let nAfterMethods = List.delete x afterMethods in
 								(Map.insert x (EAnd $ 
-									[methodsEnabled Map.! x]++ bM x beforeMethods ++ bF x beforeFp ++ bR x beforeR ++ aM x afterMethods 
+									[EDynGuard $ "EN_" ++ x] 
 									) acc2
 								, x:beforeMethods, beforeFp , beforeR, nAfterMethods)
 						else if Set.member x rs 
