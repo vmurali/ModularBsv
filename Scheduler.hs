@@ -74,51 +74,63 @@ calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simp
 
 data BoolExpr =  ETrue
 	| EFalse 
-	| EAnd BoolExpr BoolExpr
-	| EOr BoolExpr BoolExpr
-	| ENot BoolExpr
+	| EAnd [BoolExpr]
+	| ENot  BoolExpr
 	| EDynGuard String
 	deriving(Show,Eq,Ord)
 
-bigAnd :: [BoolExpr] -> BoolExpr
-bigAnd [] = ETrue
-bigAnd (t:s)= EAnd t .bigAnd $ s
 
 -- In the scheduler, I distinguish the static case of the dyna;ic case -> it's a small optimization.
-scheduler :: Set.Set String -> [[ String ]] -> Map.Map (String, String) Conflict -> Set.Set String -> Map.Map String BoolExpr
-scheduler allMsFpsRs priorityList confMatrix methodsEnabled = (\(x,y,z,t)->x) $ List.foldl
+scheduler :: Set.Set String -> Set.Set String -> Set.Set String -> [[ String ]] -> Map.Map (String, String) Conflict -> Map.Map String BoolExpr -> Map.Map String BoolExpr
+scheduler ms rs fps priorityList confMatrix methodsEnabled = (\(x,y,z,t,u)->x) $ List.foldl
 		(\acc1 elem -> List.foldl
-					(\(acc2, mySet,previouslyScheduled,afterMethods) x ->
-							let (myNewSet,newMeth) = addAfter x afterMethods mySet in
-								if Set.member x mySet then 
-									let previouslyConflicting = conflictWithBeforeSchedule acc2 x previouslyScheduled in
-										(Map.insert 
-											x 
-											(bigAnd ((EDynGuard $ "RDY_" ++ x):previouslyConflicting))
-											acc2
-										, myNewSet
-										, (x:previouslyScheduled)
-										, newMeth)
-								else (Map.insert x EFalse acc2
-									, myNewSet
-									, previouslyScheduled
-									, newMeth))  --that I can trigger 
+					(\(acc2, beforeMethods,beforeFp, beforeR, afterMethods) x ->
+						if Map.member x methodsEnabled then  --A method
+							let nAfterMethods = List.delete x afterMethods in
+								(Map.insert x (EAnd $ 
+									[methodsEnabled Map.! x]++ bM x beforeMethods ++ bF x beforeFp ++ bR x beforeR ++ aM x afterMethods 
+									) acc2
+								, x:beforeMethods, beforeFp , beforeR, nAfterMethods)
+						else if Set.member x rs 
+							then (Map.insert x --TODO
+									(EAnd $[EDynGuard $ "RDY_" ++ x ] ++bM x beforeMethods ++ bF x beforeFp ++ bR x beforeR ++ aM x afterMethods )
+									acc2
+								, beforeMethods, beforeFp, x:beforeR, afterMethods)	--A rule
+							else  (Map.insert x
+									(EAnd $ bM x beforeMethods ++ bF x beforeFp ++ bR x beforeR ++ aM x afterMethods)
+									acc2
+								, beforeMethods, x:beforeFp, beforeR, afterMethods))			-- A fp
 					acc1
 					elem)
-		(Map.empty, myInitSet methodsEnabled, [],allMsFpsRs)              --A kind of state monad, inline.
+		(Map.empty, [], [], [], Set.elems ms)
 		priorityList
-	where 
-		myInitSet = Set.fold (\elem acc -> updateThePossibilities acc elem confMatrix) allMsFpsRs
-		conflictWithBeforeSchedule acc2 x [] = []	
-		conflictWithBeforeSchedule acc2 x (h:t) =  (case confMatrix Map.! (h,x) of
-								CF -> []
-								C -> [ENot $ acc2 Map.! h]
-								SA -> []
-								SB -> [ENot $ acc2 Map.! h])++
-						(conflictWithBeforeSchedule acc2 x t) 	
-		addAfter x meths set= if Set.member x methodsEnabled then (myInitSet meths, Set.delete x meths) else (set,meths)
-
-
+	where 	bM x [] = []
+		bM x (h:t) = (case confMatrix Map.! (h,x) of 
+				CF -> ETrue
+				C  -> (ENot . EDynGuard $ "EN_" ++ h)
+				SB -> ETrue
+				SA -> (ENot . EDynGuard $ "EN_" ++ h)):(bM x t) 
+                
+                bF x [] = []
+		bF x (h:t) = (case confMatrix Map.! (h,x) of 
+				CF -> ETrue
+				C  -> EFalse
+				SB -> ETrue
+				SA -> EFalse):(bF x t) 
+                bR x [] = []
+                bR x (h:t) = (case confMatrix Map.! (h,x) of 
+				CF -> ETrue
+				C  -> (ENot . EDynGuard $ "EN_" ++ h)
+				SB -> ETrue
+				SA -> (ENot . EDynGuard $ "EN_" ++ h)):(bR x t) 
+                aM x [] = []
+                aM x (h:t) = (case confMatrix Map.! (x,h) of 
+				CF -> ETrue
+				C  -> (ENot . EDynGuard $ "EN_" ++ h)
+				SB -> ETrue
+				SA -> (ENot . EDynGuard $ "EN_" ++ h)):(aM x t) 
+		
+	
 updateThePossibilities :: Set.Set String -> String -> Map.Map (String,String) Conflict -> Set.Set String
 updateThePossibilities possibilities nextMethod conflicts = Set.filter
 		(\x -> case conflicts Map.! (nextMethod,x) of
