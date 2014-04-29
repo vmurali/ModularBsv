@@ -16,6 +16,9 @@ import Text.Parsec hiding (token)
 import Text.Parsec.String
 import Text.Parsec.Prim
 
+import Scheduler --For tests
+
+
 import Debug.Trace
 
 instance Ord a => JoinSemiLattice (Set.Set a) where
