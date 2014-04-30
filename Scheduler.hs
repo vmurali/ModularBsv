@@ -44,7 +44,7 @@ instance JoinSemiLattice (Conflict) where
 ---
 
 -- I put the domains, the calles, the conflict matrix, the mapping of parameters to have the final conflict matrix
-calcConflict :: Set.Set String -> Set.Set String -> Set.Set String -> (String -> Set.Set (String, String)) -> Map.Map ((String, String), (String, String)) Conflict -> Map.Map String String -> Map.Map (String,String) Conflict
+calcConflict :: Set.Set (String,String) -> Set.Set (String,String) -> Set.Set (String,String) -> ((String,String) -> Set.Set ((String, String))) -> Map.Map ((String, String), (String, String)) Conflict -> Map.Map (String,String) (String,String) -> Map.Map ((String,String),(String,String)) Conflict
 calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simplify this things!
 	let union = Set.unions [rs, ms, realFp fps] in
 		Set.fold 	
@@ -66,7 +66,9 @@ calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simp
 		liftThisSet = joins1 . Set.elems
 		realFp set = Set.map (\x->mapFormalReal Map.! x) set
 
---TODO : Perhaps a structure of Map.Map String Bool is less efficient than a Set.Set String containing the scheduled methods.
+--conflictCalled :: Map.Map (String,String) [String] -> Map.Map (String,String) Conflict -> Map.Map ((String,String),(String,String)) Conflict 
+
+
 
 --
 --CORE of the scheduler
@@ -165,15 +167,15 @@ scheduler ms rs fps priorityList confMatrix = Map.map simplifyCircuitAnd .(\(x,y
 				SA -> (ENot . EDynGuard $ "EN_" ++ h)):(aM x t) 
 		
 	
-updateThePossibilities :: Set.Set String -> String -> Map.Map (String,String) Conflict -> Set.Set String
-updateThePossibilities possibilities nextMethod conflicts = Set.filter
-		(\x -> case conflicts Map.! (nextMethod,x) of
-				C -> False
-				SA -> False
-				SB -> True 
-				CF -> True)
-		possibilities
-
+--updateThePossibilities :: Set.Set String -> String -> Map.Map (String,String) Conflict -> Set.Set String
+--updateThePossibilities possibilities nextMethod conflicts = Set.filter
+--		(\x -> case conflicts Map.! (nextMethod,x) of
+--				C -> False
+--				SA -> False
+--				SB -> True 
+--				CF -> True)
+--		possibilities
+--
 
 
 
