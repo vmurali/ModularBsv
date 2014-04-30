@@ -79,6 +79,29 @@ data BoolExpr =  ETrue
 	| EDynGuard String
 	deriving(Show,Eq,Ord)
 
+testMs = Set.fromList [ "m_1"
+				
+		] 
+
+testRs = Set.fromList ["r_1"
+		]
+
+testFps = Set.fromList [ "fp_1"
+		]
+
+testPl = [["fp_1"],["r_1"],["m_1"]]
+
+testConfMatrix = Map.fromList [(("fp_1"   ,"fp_1"), CF)
+				, (("fp_1","r_1" ),  SA )
+				, (("fp_1","m_1" ), CF )
+				, (("r_1","fp_1"), SB ) 
+				, (("r_1","r_1"),  CF )
+				, (("r_1","m_1"), C )
+				, (("m_1","fp_1"), CF )
+				, (("m_1","r_1" ), C )
+				, (("m_1","m_1" ), CF )
+				]
+
 
 -- In the scheduler, I distinguish the static case of the dyna;ic case -> it's a small optimization.
 scheduler :: Set.Set String -> Set.Set String -> Set.Set String -> [[ String ]] -> Map.Map (String, String) Conflict ->  Map.Map String BoolExpr
@@ -139,6 +162,8 @@ updateThePossibilities possibilities nextMethod conflicts = Set.filter
 				SB -> True 
 				CF -> True)
 		possibilities
+
+
 
 
 
