@@ -36,9 +36,8 @@ type MethodSet = Set.Set Method
 --
 --TODO TODO
 --TODO TODO
---
---ADD THE SUPPORT OF THE RULES -> Normally it's easy.
---
+-- DO NOT DIVE INTO FPS
+-- CHECK IF I NEED TO CHANGE SOMETHING FOR STRING,STRING I don't think so.
 
 ehrList = [0..5]
 
