@@ -79,6 +79,17 @@ data BoolExpr =  ETrue
 	| EDynGuard String
 	deriving(Show,Eq,Ord)
 
+simplifyCircuitAnd :: BoolExpr ->  BoolExpr
+simplifyCircuitAnd x = case x of
+	EAnd l -> if List.elem EFalse l 
+			then EFalse
+			else case List.filter (\x -> x/= ETrue) l of
+				[] -> ETrue
+				l' -> EAnd l'
+			 
+	_ -> x
+
+
 testMs = Set.fromList [ "m_1"
 				
 		] 
@@ -89,7 +100,7 @@ testRs = Set.fromList ["r_1"
 testFps = Set.fromList [ "fp_1"
 		]
 
-testPl = [["fp_1"],["r_1"],["m_1"]]
+testPl = [["m_1"],["r_1"],["fp_1"]]
 
 testConfMatrix = Map.fromList [(("fp_1"   ,"fp_1"), CF)
 				, (("fp_1","r_1" ),  SA )
@@ -105,7 +116,7 @@ testConfMatrix = Map.fromList [(("fp_1"   ,"fp_1"), CF)
 
 -- In the scheduler, I distinguish the static case of the dyna;ic case -> it's a small optimization.
 scheduler :: Set.Set String -> Set.Set String -> Set.Set String -> [[ String ]] -> Map.Map (String, String) Conflict ->  Map.Map String BoolExpr
-scheduler ms rs fps priorityList confMatrix = (\(x,y,z,t,u)->x) $ List.foldl
+scheduler ms rs fps priorityList confMatrix = Map.map simplifyCircuitAnd .(\(x,y,z,t,u)->x) $ List.foldl
 		(\acc1 elem -> List.foldl
 					(\(acc2, beforeMethods,beforeFp, beforeR, afterMethods) x ->
 						if Set.member x ms then  --A method
