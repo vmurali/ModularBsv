@@ -68,14 +68,14 @@ data Module = Module { name :: String
 	, methods :: [ Method ]
 	, fps :: [ Fp ]
 	, conflictMatrix :: Map.Map (String, String) Conflict 
-	, priorityList :: [ [ String ] ]
+	, priorityList :: [ [ (String,String) ] ]
 } deriving(Show,Eq,Ord)--Done
 
 data Conflict =  C | CF | SB | SA deriving(Show,Eq,Ord)
 
 data Instance = Instance {instName :: String
 	, instModule :: String
-	, instArgs :: [ String ]
+	, instArgs :: [[ (String,String) ]] --hacky
 } deriving(Show,Eq,Ord)--Done
 
 data Binding = Binding {bindName :: String
@@ -204,7 +204,7 @@ moduleParser = do
 ---
 
 
-instancesParser :: Parser ([Either Instance ([Fp], [[String]], Map.Map (String,String) Conflict)])
+instancesParser :: Parser ([Either Instance ([Fp], [[(String,String)]], Map.Map (String,String) Conflict)])
 instancesParser = do
 	--Either FP, either instance
 	listInstances <- lookAhead . many $ (try bodyInstanceParser) <|> (try instanceParser)
@@ -214,7 +214,7 @@ instancesParser = do
 	  where process [] l fp = []
 		process (t:q) l fp = case t of
 					Left a -> (Left a{instArgs = (extr l $instName a)}):(process q l fp)
-					Right (a,b) ->(Right(a, map words . instArgs . head $ fp, b)):(process q l fp)
+					Right (a,b) ->(Right(a, instArgs . head $ fp, b)):(process q l fp)
 					--If hd fails it's that there is no priority list in the sourcecode	
 		extr [] n= []
 		extr (t:q) n = if n == instName t then instArgs t else extr q  n
@@ -594,10 +594,17 @@ nothingP = do
 formalParametersParser :: Parser [Instance]
 formalParametersParser = many $ try formalParameterParser
 
+dotName :: Parser (String,String)
+dotName = do
+	n1 <- identifier <* dot
+	n2 <- identifier
+	return (n1,n2)	
+	
+
 formalParameterParser :: Parser Instance
 formalParameterParser = do
-	name <- identifier <* colon
-	par <- parens . many $  (try.parens.many $ noneOf [')']) <|> identifier  
+	name <- identifier <* colon 
+	par <- parens . many $  (try.parens.many $ dotName) <|> (try $ do{name<-dotName; return [name]})  
 	return Instance{instName = name
  		, instModule = "hack" --I don't remember why I thought it was smart to return Instance ... 
 		, instArgs = par}
