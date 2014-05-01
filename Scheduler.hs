@@ -66,11 +66,20 @@ calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simp
 		liftThisSet = joins1 . Set.elems
 		realFp set = Set.map (\x->mapFormalReal Map.! x) set
 
-conflictCalled :: [[ (String,String) ]] -> [ Fp ] -> Set.Set (String,String) ->  Map.Map (String, String) Conflict -> Map.Map (String,String) [String] -> (String -> Map.Map ((String,String),(String,String)) Conflict) -> Map.Map ((String,String),(String,String)) Conflict 
+
+--
+--TODO : this function can be updated to a Fixpoint trick
+--
+--
+
+conflictCalled :: (String -> [[ (String,String) ]]) -> [ Fp ] -> Set.Set (String,String) ->  Map.Map (String, String) Conflict -> Map.Map (String,String) [String] -> (String -> Map.Map ((String,String),(String,String)) Conflict) -> Map.Map ((String,String),(String,String)) Conflict 
 conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflictOfEachPairInsideModule = --Do we want ((m,h),(m,h))? What is the conflict associated? 
 	Set.fold
 		(\(m1,h1) acc1 -> Set.fold
-					(\(m2,h2) acc2 ->  Map.insert ((m1,h1),(m2,h2)) (conflict ((m1,h1),(m2,h2))) acc2)
+					(\(m2,h2) acc2 ->  Map.insert 
+								((m1,h1),(m2,h2)) 
+								(conflict ((m1,h1),(m2,h2)))
+								acc2)
 					acc1
 					calles)
 		Map.empty
@@ -80,11 +89,23 @@ conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflict
 					   | m1 == m2 = (conflictOfEachPairInsideModule m1) Map.! (("this",h1),("this",h2))
 					   | m1 == "fp" = let listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2) in joins1 . map (\p-> conflict ((m1,h1),p)) $ listFps2
 					   | m2 == "fp" = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1) in joins1 . map (\p-> conflict (p,(m2,h2))) $ listFps1
-					   | otherwise = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1)
-					 	 	     listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2)	
-							     in joins1 . map (\(p,q) -> conflict (p,q))$ zip listFps1 listFps2  
+					   | otherwise  = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1)
+					 	 	      listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2)	
+							      in joins1 . map (\(p,q) -> conflict (p,q))$ zip listFps1 listFps2  
 		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
-		correspondingFp mod = Map.fromList . zip (map (\x -> fpName x) fps) $ map head actualFps
+		correspondingFp mod = Map.fromList . zip (map (\x -> fpName x) fps) $ map head (actualFps mod)
+
+fpUse :: (String -> [[ (String,String) ]]) -> (String-> [ Fp ]) -> [(String,String)] -> String -> [String]
+fpUse actualFps fps (x:xs) mod =
+	let (modN,metN) = x 
+	in if modN == "fp" && (List.elem metN $ map (\fp-> fpName fp) (fps $ mod)) 
+		then metN:(fpUse actualFps fps xs mod)
+		else fpUse actualFps fps (replace x ++xs) mod
+	where 
+		replace (a,b) = let l = fpUse actualFps fps [(a,b)] a in
+					toActualFp a l		 
+		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
+		correspondingFp m1 = Map.fromList . zip (map (\x -> fpName x) (fps $ mod  )) $ map head (actualFps m1)
 
 --
 --CORE of the scheduler
