@@ -66,8 +66,22 @@ calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simp
 		liftThisSet = joins1 . Set.elems
 		realFp set = Set.map (\x->mapFormalReal Map.! x) set
 
---conflictCalled :: Map.Map (String,String) [String] -> Map.Map (String,String) Conflict -> Map.Map ((String,String),(String,String)) Conflict 
-
+conflictCalled :: Set.Set (String,String) ->  Map.Map (String, String) Conflict -> Map.Map (String,String) [String] -> (String -> Map.Map ((String,String),(String,String)) Conflict) -> Map.Map ((String,String),(String,String)) Conflict 
+conflictCalled  calles conflictFp fpOfEachMethodInternally conflictOfEachPairInsideModule = --Do we want ((m,h),(m,h))? What is the conflict associated? 
+	Set.fold
+		(\(m1,h1) acc1 -> Set.fold
+					(\(m2,h2) acc2 ->  Map.insert ((m1,h1),(m2,h2)) (conflict ((m1,h1),(m2,h2))) acc2)
+					acc1
+					calles)
+		Map.empty
+		calles
+	where conflict ((m1,h1),(m2,h2)) | m1 == "fp" , m2 == "fp" = conflictFp Map.! (h1,h2) 
+					 | m1 == m2 = (conflictOfEachPairInsideModule m1) Map.! (("this",h1),("this",h2))
+					 | m1 == "fp" = let listFps2 = undefined in joins1 . map (\p-> conflict ((m1,h1),p)) $ listFps2
+					 | m2 == "fp" = let listFps1 = undefined in joins1 . map (\p-> conflict (p,(m2,h2))) $ listFps1
+					 | otherwise = let listFps1 = undefined--fpOfEachMethodInternally (h1,m1)
+					 	 	   listFps2 = undefined--fpOfEachMethodInternally (h2,m2)	
+							   in joins1 . map (\(p,q) -> conflict (p,q))$ zip listFps1 listFps2  
 
 
 --
