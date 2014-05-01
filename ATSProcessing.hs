@@ -38,6 +38,9 @@ type MethodSet = Set.Set Method
 --TODO TODO
 -- DO NOT DIVE INTO FPS
 -- CHECK IF I NEED TO CHANGE SOMETHING FOR STRING,STRING I don't think so.
+-- SEARCH FOR "ERROR HERE"
+
+
 
 ehrList = [0..5]
 
@@ -127,7 +130,7 @@ buildEnv m = List.foldl (\env bind -> addCstsInEnv bind env) (List.foldl (\env b
 						And a b ->  [a,b]
 						Mux a b c ->  [a,b,c]
 						Extract a b c ->  [a,b,c]
-						MCall _ -> []
+						MCall _ -> []  --ERROR HERE TODO
 						Concat l ->  l
 
 				 
@@ -182,7 +185,7 @@ expandBindingToString bind = Set.fromList $ (bindName bind : case bindExpr bind 
 	 And a b ->  [a,b]
 	 Mux a b c ->  [a,b,c]
 	 Extract a b c ->  [a,b,c]
-	 MCall _ -> []
+	 MCall _ -> [] --TODO ERROR HERE
 	 Concat l ->  l)
 
 
@@ -324,7 +327,7 @@ extractCondFromMExpr env (nMod, nMet) expr =
  
 extractCondFromBind :: Env -> (String, String) -> Set.Set String -> Binding ->  Set.Set String   --Fucking greedy. 
 extractCondFromBind env names path bind = case bindExpr bind of
-	 MCall m -> if names == (calledModule m, calledMethod m) then path else Set.empty
+	 MCall m -> if names == (calledModule m, calledMethod m) then path else Set.empty --ERROR HERE TODO
 	 Mux a b c -> Set.unions . map (extractCondFromBind env names (Set.insert a path)) $ [ env Map.! b, env Map.! c]
 	 _ -> Set.unions . map ((extractCondFromBind env names path) . ((env Map.!)))$ case bindExpr bind of 
 		 SConst a -> []
@@ -392,7 +395,7 @@ argsMethodCallInsideMExpr env names expr = (if (calledModule expr,calledMethod e
 
 argsMethodCallInsideBinding :: Env -> (String, String) -> Binding -> [[ String ]]
 argsMethodCallInsideBinding env (nMod,nMet) bind = case (bindExpr bind) of
-	MCall m -> if (calledModule m,calledMethod m) == (nMod, nMet) then [ calledArgs m ] else []
+	MCall m -> if (calledModule m,calledMethod m) == (nMod, nMet) then [ calledArgs m ] else []  --ERROR HERE TODO
 	_ -> concat . map (argsMethodCallInsideBinding env (nMod,nMet) . ( env Map.!)) $
 		case bindExpr bind of 
 			SConst a -> []
