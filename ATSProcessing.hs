@@ -130,7 +130,7 @@ buildEnv m = List.foldl (\env bind -> addCstsInEnv bind env) (List.foldl (\env b
 						And a b ->  [a,b]
 						Mux a b c ->  [a,b,c]
 						Extract a b c ->  [a,b,c]
-						MCall _ -> []  --ERROR HERE TODO
+						MCall a -> calledArgs a  --NOT NECESSARY I THINK ERROR HERE TODO
 						Concat l ->  l
 
 				 
@@ -185,7 +185,7 @@ expandBindingToString bind = Set.fromList $ (bindName bind : case bindExpr bind 
 	 And a b ->  [a,b]
 	 Mux a b c ->  [a,b,c]
 	 Extract a b c ->  [a,b,c]
-	 MCall _ -> [] --TODO ERROR HERE
+	 MCall a -> calledArgs a --TODO ERROR HERE
 	 Concat l ->  l)
 
 
@@ -213,7 +213,7 @@ expandUntilFp env init = lfpFrom init (expandBindings env)
 
 methodC :: Binding -> Maybe (String,String)
 methodC bind = case bindExpr bind of
-	MCall m -> Just (calledModule m, calledMethod m)
+	MCall m -> Just (calledModule m, calledMethod m)   --TODO I THINK IT'S FINE HERE
 	_ -> Nothing  
 
 methodsCalledInBinding :: Env -> Binding -> Set.Set (String,String)

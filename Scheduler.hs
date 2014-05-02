@@ -22,6 +22,10 @@ import Debug.Trace
 --- I love this stuff!
 ---
 
+global :: Map.Map String Module
+global = Map.empty
+
+
 instance JoinSemiLattice (Conflict) where
 	join C C = C
 	join C CF = C
@@ -39,7 +43,45 @@ instance JoinSemiLattice (Conflict) where
 	join SB SB = SB
 	join SB CF = SB
 	join CF CF = CF
-	 
+
+
+assembledBlocks :: [Module] -> [Map.Map (String,String) BoolExpr]
+assembledBlocks [] = []  --The first half is done!
+assembledBlocks (x:xs) = undefined 
+
+
+conflictAndParameters :: String -> (Map.Map (String,String) [String], Map.Map ((String,String),(String, String)) Conflict)
+conflictAndParameters m =
+	let meths = Set.fromList . map (\x->("this", methodName x)) . methods $ global Map.! m
+	in (Set.fold (\x acc1 -> Map.insert x (fpUsedByMethod actual fps' x m) acc1) Map.empty meths 
+	   , undefined)
+	where
+		actual x = instArgs . head .filter (\n -> instName n == x ) . instances $ global Map.! m
+		fps' x = fps $ global Map.! x   --Hacky name
+{-  
+conflictCalled :: (String -> [[ (String,String) ]]) -> 
+		 [ Fp ] ->
+		 Set.Set (String,String) -> 
+		 Map.Map (String, String) Conflict ->
+		 Map.Map (String,String) [String] ->
+		 (String -> Map.Map ((String,String),(String,String)) Conflict) ->
+	 Map.Map ((String,String),(String,String)) Conflict 
+
+fpUsedByMethod :: (String -> [[ (String,String) ]]) -> 
+		  (String -> [ Fp ]) ->
+	  (String,String) -> String -> [String]
+
+calcConflict :: Set.Set (String,String) -> 
+		Set.Set (String,String) ->
+		 Set.Set (String,String) ->
+		((String,String) -> Set.Set ((String, String))) -> 
+		Map.Map ((String, String), (String, String)) Conflict ->
+		Map.Map (String,String) (String,String)
+		-> Map.Map ((String,String),(String,String)) Conflict
+-}	 
+
+
+
 ---
 --- The three next functions are the core of the formal parameter thing.
 ---
@@ -70,10 +112,28 @@ calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simp
 		liftThisSet = joins1 . Set.elems
 		realFp set = Set.map (\x->mapFormalReal Map.! x) set
 
---
+-- The arguments of the next functions are the actual parameters of the submodulem the formal parameters of the submodule and this module, the current list of methods and the name of the module
+fpUse :: (String -> [[ (String,String) ]]) -> (String-> [ Fp ]) -> [(String,String)] -> String -> [String]
+fpUse actualFps fps (x:xs) mod = 
+	let (modN,metN) = x 
+	in if modN == "fp" && (List.elem metN $ map (\fp-> fpName fp) (fps $ mod)) 
+		then metN:(fpUse actualFps fps xs mod)
+		else fpUse actualFps fps (replace x ++xs) mod
+	where 
+		replace (a,b) = let l = fpUsedByMethod actualFps fps (a,b) a in
+					toActualFp a l		 
+		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
+		correspondingFp m1 = Map.fromList . zip (map (\x -> fpName x) (fps $ mod  )) $ map head (actualFps m1) 
+
+fpUsedByMethod :: (String -> [[ (String,String) ]]) -> (String-> [ Fp ]) ->  (String,String) -> String -> [String]
+fpUsedByMethod actualFps fps meth mod =
+	let env = buildEnv $ global Map.! mod 
+	    calles = Set.elems $ methodsCalled env (head . List.filter (\x-> methodName x == snd meth ) . methods $ global Map.! mod) 
+	in fpUse actualFps fps calles mod
+
+
 --
 --TODO : this function can be updated to a Fixpoint trick
---
 --
 
 conflictCalled :: (String -> [[ (String,String) ]]) -> [ Fp ] -> Set.Set (String,String) ->  Map.Map (String, String) Conflict -> Map.Map (String,String) [String] -> (String -> Map.Map ((String,String),(String,String)) Conflict) -> Map.Map ((String,String),(String,String)) Conflict 
@@ -101,25 +161,6 @@ conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflict
 
 
 
-
--- The arguments of the next functions are the actual parameters of the submodulem the formal parameters of the submodule and this module, the current list of methods and the name of the module
-fpUse :: (String -> [[ (String,String) ]]) -> (String-> [ Fp ]) -> [(String,String)] -> String -> [String]
-fpUse actualFps fps (x:xs) mod = 
-	let (modN,metN) = x 
-	in if modN == "fp" && (List.elem metN $ map (\fp-> fpName fp) (fps $ mod)) 
-		then metN:(fpUse actualFps fps xs mod)
-		else fpUse actualFps fps (replace x ++xs) mod
-	where 
-		replace (a,b) = let l = fpUsedByMethod actualFps fps (a,b) a in
-					toActualFp a l		 
-		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
-		correspondingFp m1 = Map.fromList . zip (map (\x -> fpName x) (fps $ mod  )) $ map head (actualFps m1)
-
-fpUsedByMethod :: (String -> [[ (String,String) ]]) -> (String-> [ Fp ]) ->  (String,String) -> String -> [String]
-fpUsedByMethod actualFps fps meth mod =
-	let env = undefined
-	    calles = Set.elems $ methodsCalled env mod meth 
-	in fpUse actualFps fps calles mod
 
 --
 --CORE of the scheduler
