@@ -13,6 +13,7 @@ import qualified Data.Set.Monad as Set
 
 import Algebra.Lattice  --SOOOO COOOL
 
+import ATSProcessing
 import TestParsers
 import Debug.Trace
 
@@ -40,11 +41,14 @@ instance JoinSemiLattice (Conflict) where
 	join CF CF = CF
 	 
 ---
----
+--- The three next functions are the core of the formal parameter thing.
 ---
 
 -- I put the domains, the calles, the conflict matrix, the mapping of parameters to have the final conflict matrix
-calcConflict :: Set.Set (String,String) -> Set.Set (String,String) -> Set.Set (String,String) -> ((String,String) -> Set.Set ((String, String))) -> Map.Map ((String, String), (String, String)) Conflict -> Map.Map (String,String) (String,String) -> Map.Map ((String,String),(String,String)) Conflict
+calcConflict :: Set.Set (String,String) -> Set.Set (String,String) -> Set.Set (String,String) ->
+		((String,String) -> Set.Set ((String, String))) -> 
+		Map.Map ((String, String), (String, String)) Conflict -> Map.Map (String,String) (String,String)
+		-> Map.Map ((String,String),(String,String)) Conflict
 calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simplify this things!
 	let union = Set.unions [rs, ms, realFp fps] in
 		Set.fold 	
@@ -66,7 +70,7 @@ calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simp
 		liftThisSet = joins1 . Set.elems
 		realFp set = Set.map (\x->mapFormalReal Map.! x) set
 
-
+--
 --
 --TODO : this function can be updated to a Fixpoint trick
 --
@@ -95,65 +99,37 @@ conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflict
 		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
 		correspondingFp mod = Map.fromList . zip (map (\x -> fpName x) fps) $ map head (actualFps mod)
 
+
+
+
+-- The arguments of the next functions are the actual parameters of the submodulem the formal parameters of the submodule and this module, the current list of methods and the name of the module
 fpUse :: (String -> [[ (String,String) ]]) -> (String-> [ Fp ]) -> [(String,String)] -> String -> [String]
-fpUse actualFps fps (x:xs) mod =
+fpUse actualFps fps (x:xs) mod = 
 	let (modN,metN) = x 
 	in if modN == "fp" && (List.elem metN $ map (\fp-> fpName fp) (fps $ mod)) 
 		then metN:(fpUse actualFps fps xs mod)
 		else fpUse actualFps fps (replace x ++xs) mod
 	where 
-		replace (a,b) = let l = fpUse actualFps fps [(a,b)] a in
+		replace (a,b) = let l = fpUsedByMethod actualFps fps (a,b) a in
 					toActualFp a l		 
 		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
 		correspondingFp m1 = Map.fromList . zip (map (\x -> fpName x) (fps $ mod  )) $ map head (actualFps m1)
+
+fpUsedByMethod :: (String -> [[ (String,String) ]]) -> (String-> [ Fp ]) ->  (String,String) -> String -> [String]
+fpUsedByMethod actualFps fps meth mod =
+	let env = undefined
+	    calles = Set.elems $ methodsCalled env mod meth 
+	in fpUse actualFps fps calles mod
 
 --
 --CORE of the scheduler
 --
 
-data BoolExpr =  ETrue
-	| EFalse 
-	| EAnd [BoolExpr]
-	| ENot  BoolExpr
-	| EDynGuard String
-	deriving(Show,Eq,Ord)
+--
+--V1 : The scheduler is combinatorial. I could schedule things with registers, it could be usefull.
+-- Interests -> To have intermediate results.
+--
 
-simplifyCircuitAnd :: BoolExpr ->  BoolExpr
-simplifyCircuitAnd x = case x of
-	EAnd l -> if List.elem EFalse l 
-			then EFalse
-			else case List.filter (\x -> x/= ETrue) l of
-				[] -> ETrue
-				l' -> EAnd l'
-			 
-	_ -> x
-
-
-testMs = Set.fromList [ "m_1"
-				
-		] 
-
-testRs = Set.fromList ["r_1"
-		]
-
-testFps = Set.fromList [ "fp_1"
-		]
-
-testPl = [["m_1"],["r_1"],["fp_1"]]
-
-testConfMatrix = Map.fromList [(("fp_1"   ,"fp_1"), CF)
-				, (("fp_1","r_1" ),  SA )
-				, (("fp_1","m_1" ), CF )
-				, (("r_1","fp_1"), SB ) 
-				, (("r_1","r_1"),  CF )
-				, (("r_1","m_1"), C )
-				, (("m_1","fp_1"), CF )
-				, (("m_1","r_1" ), C )
-				, (("m_1","m_1" ), CF )
-				]
-
-
--- In the scheduler, I distinguish the static case of the dyna;ic case -> it's a small optimization.
 scheduler :: Set.Set (String,String) -> Set.Set (String,String) -> Set.Set (String,String) -> [[ (String,String) ]] -> Map.Map ((String,String),(String,String)) Conflict ->  Map.Map (String,String) BoolExpr
 scheduler ms rs fps priorityList confMatrix = Map.map simplifyCircuitAnd .(\(x,y,z,t,u)->x) $ List.foldl
 		(\acc1 elem -> List.foldl
@@ -204,16 +180,53 @@ scheduler ms rs fps priorityList confMatrix = Map.map simplifyCircuitAnd .(\(x,y
 				SA -> (ENot . EDynGuard $ "EN_" ++ snd h)):(aM x t) 
 		
 	
---updateThePossibilities :: Set.Set String -> String -> Map.Map (String,String) Conflict -> Set.Set String
---updateThePossibilities possibilities nextMethod conflicts = Set.filter
---		(\x -> case conflicts Map.! (nextMethod,x) of
---				C -> False
---				SA -> False
---				SB -> True 
---				CF -> True)
---		possibilities
+
+--
+--Tools for scheduling. TODO : Add bindings for that.
+--
+data BoolExpr =  ETrue
+	| EFalse 
+	| EAnd [BoolExpr]
+	| ENot  BoolExpr
+	| EDynGuard String
+	deriving(Show,Eq,Ord)
+
+simplifyCircuitAnd :: BoolExpr ->  BoolExpr
+simplifyCircuitAnd x = case x of
+	EAnd l -> if List.elem EFalse l 
+			then EFalse
+			else case List.filter (\x -> x/= ETrue) l of
+				[] -> ETrue
+				l' -> EAnd l'
+			 
+	_ -> x
+
+--
+--Test case for the scheduler.
 --
 
+testMs = Set.fromList [ "m_1"
+				
+		] 
+
+testRs = Set.fromList ["r_1"
+		]
+
+testFps = Set.fromList [ "fp_1"
+		]
+
+testPl = [["m_1"],["r_1"],["fp_1"]]
+
+testConfMatrix = Map.fromList [(("fp_1"   ,"fp_1"), CF)
+				, (("fp_1","r_1" ),  SA )
+				, (("fp_1","m_1" ), CF )
+				, (("r_1","fp_1"), SB ) 
+				, (("r_1","r_1"),  CF )
+				, (("r_1","m_1"), C )
+				, (("m_1","fp_1"), CF )
+				, (("m_1","r_1" ), C )
+				, (("m_1","m_1" ), CF )
+				]
 
 
 
