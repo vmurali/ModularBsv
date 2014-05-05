@@ -263,27 +263,27 @@ simplifyCircuitAnd x = case x of
 --Test case for the scheduler.
 --
 
-testMs = Set.fromList [ "m_1"
+testMs = Set.fromList [( "this","m_1")
 				
 		] 
 
-testRs = Set.fromList ["r_1"
+testRs = Set.fromList [("this","r_1")
 		]
 
-testFps = Set.fromList [ "fp_1"
+testFps = Set.fromList [ ("this","fp_1")
 		]
 
-testPl = [["m_1"],["r_1"],["fp_1"]]
+testPl = [[("this","m_1")],[("this","r_1")],[("this","fp_1")]]
 
-testConfMatrix = Map.fromList [(("fp_1"   ,"fp_1"), CF)
-				, (("fp_1","r_1" ),  SA )
-				, (("fp_1","m_1" ), CF )
-				, (("r_1","fp_1"), SB ) 
-				, (("r_1","r_1"),  CF )
-				, (("r_1","m_1"), C )
-				, (("m_1","fp_1"), CF )
-				, (("m_1","r_1" ), C )
-				, (("m_1","m_1" ), CF )
+testConfMatrix = Map.fromList [((("this","fp_1")   ,("this","fp_1")), CF)
+				, ((("this","fp_1"),("this","r_1" )),  SA )
+				, ((("this","fp_1"),("this","m_1" )), CF )
+				, ((("this","r_1"),("this","fp_1")), SB ) 
+				, ((("this","r_1"),("this","r_1")),  CF )
+				, ((("this","r_1"),("this","m_1")), C )
+				, ((("this","m_1"),("this","fp_1")), CF )
+				, ((("this","m_1"),("this","r_1" )), C )
+				, ((("this","m_1"),("this","m_1" )), CF )
 				]
 
 
