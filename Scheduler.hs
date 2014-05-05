@@ -22,10 +22,6 @@ import Debug.Trace
 --- I love this stuff!
 ---
 
-global :: Map.Map String Module
-global = Map.empty
-
-
 instance JoinSemiLattice (Conflict) where
 	join C C = C
 	join C CF = C
@@ -45,54 +41,58 @@ instance JoinSemiLattice (Conflict) where
 	join CF CF = CF
 
 
-assembledBlocks :: [Module] -> [Map.Map (String,String) BoolExpr]
-assembledBlocks [] = []  --The first half is done!
-assembledBlocks (x:xs) = undefined 
 
 
-conflictAndParameters :: String -> (Map.Map (String,String) [String], Map.Map ((String,String),(String, String)) Conflict)
-conflictAndParameters m =
-	let meths = Set.fromList . map (\x->("this", methodName x)) . methods $ global Map.! m
-	in (Set.fold (\x acc1 -> Map.insert x (fpUsedByMethod actual fps' x m) acc1) Map.empty meths 
-	   , undefined)
-	where
-		actual x = instArgs . head .filter (\n -> instName n == x ) . instances $ global Map.! m
-		fps' x = fps $ global Map.! x   --Hacky name
-{-  
-conflictCalled :: (String -> [[ (String,String) ]]) -> 
-		 [ Fp ] ->
-		 Set.Set (String,String) -> 
-		 Map.Map (String, String) Conflict ->
-		 Map.Map (String,String) [String] ->
-		 (String -> Map.Map ((String,String),(String,String)) Conflict) ->
-	 Map.Map ((String,String),(String,String)) Conflict 
+data PData = PData {fpNames :: [String]
+			, actualParametersForEachInst :: Map.Map String [String] 
+			, cM :: Map.Map ((String,String),(String,String)) Conflict }
 
-fpUsedByMethod :: (String -> [[ (String,String) ]]) -> 
-		  (String -> [ Fp ]) ->
-	  (String,String) -> String -> [String]
-
-calcConflict :: Set.Set (String,String) -> 
-		Set.Set (String,String) ->
-		 Set.Set (String,String) ->
-		((String,String) -> Set.Set ((String, String))) -> 
-		Map.Map ((String, String), (String, String)) Conflict ->
-		Map.Map (String,String) (String,String)
-		-> Map.Map ((String,String),(String,String)) Conflict
--}	 
+type PDatas = Map.Map String PData  --Data exported by each module compiled
 
 
+compileAModule :: Module -> PDatas -> PDatas --This function add the information of compilation into the environnement of type PDatas
+compileAModule currentModule publicData =
+	let meths  = Set.fromList . map (\x->("this", methodName x)) . methods $ currentModule 
+ 	    rs     = Set.fromList . map (\x->("this", ruleName x)) . rules $ currentModule
+ 	    fpsLoc = Set.fromList . map (\x->("this", fpName x)) . fps $ currentModule
+	    env = buildEnv currentModule 
+	in Map.insert 
+		(name currentModule)
+		PData {fpNames = map (\x -> fpName x) $ fps currentModule   
+		      , actualParametersForEachInst = List.foldl
+							(\acc x -> Map.insert (methodName x) 
+									      (map snd . filter (\(a,b)-> a=="fp" ). Set.elems . methodsCalled env $ x)
+									      acc)
+							Map.empty
+							$ methods currentModule   
+		      , cM = calcConflict 
+				rs
+				meths
+				fpsLoc
+				(methodsCalled env . (\x -> head . filter (\y -> ("this",methodName y) == x) $ methods currentModule))
+				$ conflictCalled 
+					(\x->  map (\under -> head under) . instArgs . head . filter (\i -> instName i == x) . instances $ currentModule)						
+					(fps currentModule)
+					(Set.union fpsLoc meths)
+					(conflictMatrix currentModule)
+					(Set.fold (\elem acc -> Map.insert elem (fpUsedByMethod (\x y -> (actualParametersForEachInst $ publicData Map.! x) Map.! y )
+							      		(\x -> fpNames $ publicData Map.! x )
+							      		elem --methodname
+							      		currentModule) acc) Map.empty meths)
+					(\x -> cM $ publicData Map.! x)}
+		publicData	
 
----
---- The three next functions are the core of the formal parameter thing.
----
 
--- I put the domains, the calles, the conflict matrix, the mapping of parameters to have the final conflict matrix
-calcConflict :: Set.Set (String,String) -> Set.Set (String,String) -> Set.Set (String,String) ->
-		((String,String) -> Set.Set ((String, String))) -> 
-		Map.Map ((String, String), (String, String)) Conflict -> Map.Map (String,String) (String,String)
-		-> Map.Map ((String,String),(String,String)) Conflict
-calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simplify this things!
-	let union = Set.unions [rs, ms, realFp fps] in
+
+ 
+calcConflict :: Set.Set (String,String) ->   --Set of rules
+		Set.Set (String,String) ->   --Set of defined methods
+		Set.Set (String,String) ->   --Set of formal parameters
+		((String,String) -> Set.Set ((String, String))) ->	--Calles function (It's a local thing to the module)
+		Map.Map ((String, String), (String, String)) Conflict   --confMatrix, output of the conflictCalled function
+		-> Map.Map ((String,String),(String,String)) Conflict   --conflict matrix on defined methods
+calcConflict rs ms fps calles confMatrix = 
+	let union = Set.unions [rs, ms, fps] in
 		Set.fold 	
 			(\arg1 acc1 -> Set.fold 
 					(\arg2 acc2 -> Map.insert (arg1, arg2) (conflict arg1 arg2) acc2)
@@ -110,33 +110,44 @@ calcConflict rs ms fps calles confMatrix mapFormalReal = --Haskell stuff to simp
 						(Set.singleton CF)
 						callesx
 		liftThisSet = joins1 . Set.elems
-		realFp set = Set.map (\x->mapFormalReal Map.! x) set
+
+
+
+---
+--- This code has been a little been factorized.
+---
 
 -- The arguments of the next functions are the actual parameters of the submodulem the formal parameters of the submodule and this module, the current list of methods and the name of the module
-fpUse :: (String -> [[ (String,String) ]]) -> (String-> [ Fp ]) -> [(String,String)] -> String -> [String]
-fpUse actualFps fps (x:xs) mod = 
+fpUse :: (String -> String -> [ String ]) -> (String-> [ String ]) -> [(String,String)] -> Module -> [String]
+fpUse actualFps allFps (x:xs) mod = 
 	let (modN,metN) = x 
-	in if modN == "fp" && (List.elem metN $ map (\fp-> fpName fp) (fps $ mod)) 
-		then metN:(fpUse actualFps fps xs mod)
-		else fpUse actualFps fps (replace x ++xs) mod
-	where 
-		replace (a,b) = let l = fpUsedByMethod actualFps fps (a,b) a in
-					toActualFp a l		 
+	in if modN == "fp" && (List.elem metN . allFps . name $ mod  ) 
+		then metN:(fpUse actualFps allFps xs mod)
+		else fpUse actualFps allFps (replace x ++ xs) mod
+	where
+		replace (a,b) = let l = actualFps a b in
+					toActualFp a l	 
 		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
-		correspondingFp m1 = Map.fromList . zip (map (\x -> fpName x) (fps $ mod  )) $ map head (actualFps m1) 
+		correspondingFp m1 = Map.fromList . zip (allFps m1) . head . instArgs . head . filter (\x->instName x == m1) . instances $ mod --hacky head 
 
-fpUsedByMethod :: (String -> [[ (String,String) ]]) -> (String-> [ Fp ]) ->  (String,String) -> String -> [String]
-fpUsedByMethod actualFps fps meth mod =
-	let env = buildEnv $ global Map.! mod 
-	    calles = Set.elems $ methodsCalled env (head . List.filter (\x-> methodName x == snd meth ) . methods $ global Map.! mod) 
-	in fpUse actualFps fps calles mod
+fpUsedByMethod :: (String -> String -> [ String ]) -> (String-> [ String ]) ->  (String,String) -> Module -> [String]
+fpUsedByMethod actualFps allFps meth mod =
+	let env    = buildEnv mod 
+	    calles = Set.elems $ methodsCalled env (head . List.filter (\x-> methodName x == snd meth ) . methods $ mod) 
+	in fpUse actualFps allFps calles mod
 
 
 --
 --TODO : this function can be updated to a Fixpoint trick
 --
 
-conflictCalled :: (String -> [[ (String,String) ]]) -> [ Fp ] -> Set.Set (String,String) ->  Map.Map (String, String) Conflict -> Map.Map (String,String) [String] -> (String -> Map.Map ((String,String),(String,String)) Conflict) -> Map.Map ((String,String),(String,String)) Conflict 
+conflictCalled :: (String -> [(String,String)]) --actual fps instances -> list of methods 
+		-> [ Fp ]  --fps
+		-> Set.Set (String,String)    --Methods called
+		->  Map.Map (String, String) Conflict --conflict between FPs
+		-> Map.Map (String,String) [String] -> -- fp of each method internally
+		 (String -> Map.Map ((String,String),(String,String)) Conflict) -- conflict inside instances
+		-> Map.Map ((String,String),(String,String)) Conflict 
 conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflictOfEachPairInsideModule = --Do we want ((m,h),(m,h))? What is the conflict associated? 
 	Set.fold
 		(\(m1,h1) acc1 -> Set.fold
@@ -156,8 +167,9 @@ conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflict
 					   | otherwise  = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1)
 					 	 	      listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2)	
 							      in joins1 . map (\(p,q) -> conflict (p,q))$ zip listFps1 listFps2  
+		-- Todo : Check this piece of code
 		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
-		correspondingFp mod = Map.fromList . zip (map (\x -> fpName x) fps) $ map head (actualFps mod)
+		correspondingFp mod = Map.fromList . zip (map (\x -> fpName x) fps) $ actualFps mod
 
 
 
@@ -171,7 +183,12 @@ conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflict
 -- Interests -> To have intermediate results.
 --
 
-scheduler :: Set.Set (String,String) -> Set.Set (String,String) -> Set.Set (String,String) -> [[ (String,String) ]] -> Map.Map ((String,String),(String,String)) Conflict ->  Map.Map (String,String) BoolExpr
+scheduler :: Set.Set (String,String) -> --Set of defined methods
+	     Set.Set (String,String) -> --Set of rules
+	     Set.Set (String,String) -> --Set of formal parameters
+	     [[ (String,String) ]] -> --Priority List 
+	     Map.Map ((String,String),(String,String)) Conflict -> --Conflict matrix provided by the calcConflict function?
+	     Map.Map (String,String) BoolExpr   --Combinatorial scheduler
 scheduler ms rs fps priorityList confMatrix = Map.map simplifyCircuitAnd .(\(x,y,z,t,u)->x) $ List.foldl
 		(\acc1 elem -> List.foldl
 					(\(acc2, beforeMethods,beforeFp, beforeR, afterMethods) x ->

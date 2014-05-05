@@ -213,7 +213,7 @@ expandUntilFp env init = lfpFrom init (expandBindings env)
 
 methodC :: Binding -> Maybe (String,String)
 methodC bind = case bindExpr bind of
-	MCall m -> Just (calledModule m, calledMethod m)   --TODO I THINK IT'S FINE HERE
+	MCall m -> Just (calledModule m, calledMethod m)   -- ERROR HERETODO I THINK IT'S FINE HERE
 	_ -> Nothing  
 
 methodsCalledInBinding :: Env -> Binding -> Set.Set (String,String)
@@ -327,7 +327,8 @@ extractCondFromMExpr env (nMod, nMet) expr =
  
 extractCondFromBind :: Env -> (String, String) -> Set.Set String -> Binding ->  Set.Set String   --Fucking greedy. 
 extractCondFromBind env names path bind = case bindExpr bind of
-	 MCall m -> if names == (calledModule m, calledMethod m) then path else Set.empty --ERROR HERE TODO
+	 MCall m -> if names == (calledModule m, calledMethod m) then path else Set.unions . map ((extractCondFromBind env names path) . ((env Map.!))) 
+										$calledArgs m--ERROR HERE TODO
 	 Mux a b c -> Set.unions . map (extractCondFromBind env names (Set.insert a path)) $ [ env Map.! b, env Map.! c]
 	 _ -> Set.unions . map ((extractCondFromBind env names path) . ((env Map.!)))$ case bindExpr bind of 
 		 SConst a -> []
@@ -395,7 +396,10 @@ argsMethodCallInsideMExpr env names expr = (if (calledModule expr,calledMethod e
 
 argsMethodCallInsideBinding :: Env -> (String, String) -> Binding -> [[ String ]]
 argsMethodCallInsideBinding env (nMod,nMet) bind = case (bindExpr bind) of
-	MCall m -> if (calledModule m,calledMethod m) == (nMod, nMet) then [ calledArgs m ] else []  --ERROR HERE TODO
+	MCall m -> if (calledModule m,calledMethod m) == (nMod, nMet) then [ calledArgs m ] 
+								      else concat .map 
+										(argsMethodCallInsideBinding env (nMod,nMet) . (env Map.!))
+										$calledArgs m--ERROR HERE TODO
 	_ -> concat . map (argsMethodCallInsideBinding env (nMod,nMet) . ( env Map.!)) $
 		case bindExpr bind of 
 			SConst a -> []
