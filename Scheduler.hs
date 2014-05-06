@@ -44,7 +44,7 @@ instance JoinSemiLattice (Conflict) where
 
 
 data PData = PData {fpNames :: [String]
-			, actualParametersForEachInst :: Map.Map String [String] 
+			, formalParametersForEachMethod :: Map.Map String [String] 
 			, cM :: Map.Map ((String,String),(String,String)) Conflict }
 
 type PDatas = Map.Map String PData  --Data exported by each module compiled
@@ -59,7 +59,7 @@ compileAModule currentModule publicData =
 	in Map.insert 
 		(name currentModule)
 		PData {fpNames = map (\x -> fpName x) $ fps currentModule   
-		      , actualParametersForEachInst = List.foldl
+		      , formalParametersForEachMethod = List.foldl
 							(\acc x -> Map.insert (methodName x) 
 									      (map snd . filter (\(a,b)-> a=="fp" ). Set.elems . methodsCalled env $ x)
 									      acc)
@@ -75,7 +75,7 @@ compileAModule currentModule publicData =
 					(fps currentModule)
 					(Set.union fpsLoc meths)
 					(conflictMatrix currentModule)
-					(Set.fold (\elem acc -> Map.insert elem (fpUsedByMethod (\x y -> (actualParametersForEachInst $ publicData Map.! x) Map.! y )
+					(Set.fold (\elem acc -> Map.insert elem (fpUsedByMethod (\x y -> (formalParametersForEachMethod $ publicData Map.! x) Map.! y )
 							      		(\x -> fpNames $ publicData Map.! x )
 							      		elem --methodname
 							      		currentModule) acc) Map.empty meths)
@@ -141,14 +141,14 @@ fpUsedByMethod actualFps allFps meth mod =
 --TODO : this function can be updated to a Fixpoint trick
 --
 
-conflictCalled :: (String -> [(String,String)]) --actual fps instances -> list of methods 
-		-> [ Fp ]  --fps
-		-> Set.Set (String,String)    --Methods called
-		->  Map.Map (String, String) Conflict --conflict between FPs
-		-> Map.Map (String,String) [String] -> -- fp of each method internally
-		 (String -> Map.Map ((String,String),(String,String)) Conflict) -- conflict inside instances
-		-> Map.Map ((String,String),(String,String)) Conflict 
-conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflictOfEachPairInsideModule = --Do we want ((m,h),(m,h))? What is the conflict associated? 
+conflictCalled :: (String -> [(String,String)]) -- Mapping from instance to actual arguments
+		-> [ Fp ]  -- List of formal parameters of the local module
+		-> Set.Set (String,String)    -- Full set of called methods (including formal parameters) in the local module
+		-> Map.Map (String, String) Conflict -- conflict between FPs (provided by user ultimately)
+		-> Map.Map (String,String) [String] -- Formal parameters of module Mi called by a particular method mi.h called in the local module
+		-> (String -> Map.Map ((String,String),(String,String)) Conflict) -- For each mi, conflict between mi.h1 and mi.h2 (obtained from Mi)
+		-> Map.Map ((String,String),(String,String)) Conflict  -- Conflict matrix of every called method
+conflictCalled actualArgs fps calles conflictFp fpOfEachInstMethod conflictOfPairInSameModule = --Do we want ((m,h),(m,h))? What is the conflict associated? 
 	Set.fold
 		(\(m1,h1) acc1 -> Set.fold
 					(\(m2,h2) acc2 ->  Map.insert 
@@ -161,15 +161,15 @@ conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflict
 		calles
 	where 
 		conflict ((m1,h1),(m2,h2)) | m1 == "fp" , m2 == "fp" = conflictFp Map.! (h1,h2) 
-					   | m1 == m2 = (conflictOfEachPairInsideModule m1) Map.! (("this",h1),("this",h2))
-					   | m1 == "fp" = let listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2) in joins1 . map (\p-> conflict ((m1,h1),p)) $ listFps2
-					   | m2 == "fp" = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1) in joins1 . map (\p-> conflict (p,(m2,h2))) $ listFps1
-					   | otherwise  = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1)
-					 	 	      listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2)	
+					   | m1 == m2 = (conflictOfPairInSameModule m1) Map.! (("this",h1),("this",h2))
+					   | m1 == "fp" = let listFps2 = toActualFp m2 $ fpOfEachInstMethod Map.! (m2,h2) in joins1 . map (\p-> conflict ((m1,h1),p)) $ listFps2
+					   | m2 == "fp" = let listFps1 = toActualFp m1 $ fpOfEachInstMethod Map.! (m1,h1) in joins1 . map (\p-> conflict (p,(m2,h2))) $ listFps1
+					   | otherwise  = let listFps1 = toActualFp m1 $ fpOfEachInstMethod Map.! (m1,h1)
+					 	 	      listFps2 = toActualFp m2 $ fpOfEachInstMethod Map.! (m2,h2)	
 							      in joins1 . map (\(p,q) -> conflict (p,q))$ zip listFps1 listFps2  
 		-- Todo : Check this piece of code
 		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
-		correspondingFp mod = Map.fromList . zip (map (\x -> fpName x) fps) $ actualFps mod
+		correspondingFp mod = Map.fromList . zip (map (\x -> fpName x) fps) $ actualArgs mod
 
 
 
