@@ -185,7 +185,6 @@ conflictCalled mod actualFps allFps calles conflictFp fpOfEachMethodInternally c
  		Map.empty
  		calles
  	where 
-
  		conflict ((m1,h1),(m2,h2)) | m1 == "fp" , m2 == "fp" = conflictFp Map.! (h1,h2)  --Do we want ((m,h),(m,h))? What is the conflict associated? 
 					   | m1 == m2 = (conflictOfEachPairInsideModule m1) Map.! (("this",h1),("this",h2))
 					   | m1 == "fp" = let listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2) in joins1 . map (\p-> conflict ((m1,h1),p)) $ listFps2
