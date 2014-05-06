@@ -173,13 +173,26 @@ conflictCalled :: Module
 		-> Map.Map (String,String) [String]  -- fp of each method internally
 		-> (String -> Map.Map ((String,String),(String,String)) Conflict) -- conflict inside instances
 		-> Map.Map ((String,String),(String,String)) Conflict 
-conflictCalled mod actualFps allFps calles conflictFp fpOfEachMethodInternally conflictOfEachPairInsideModule = --Do we want ((m,h),(m,h))? What is the conflict associated? 
+conflictCalled mod actualFps allFps calles conflictFp fpOfEachMethodInternally conflictOfEachPairInsideModule =
+	Set.fold
+ 		(\(m1,h1) acc1 -> Set.fold
+ 					(\(m2,h2) acc2 ->  Map.insert 
+ 								((m1,h1),(m2,h2)) 
+ 								(conflict ((m1,h1),(m2,h2)))
+ 								acc2)
+ 					acc1
+ 					calles)
+ 		Map.empty
+ 		calles
+ 	where 
+
+ 		conflict ((m1,h1),(m2,h2)) | m1 == "fp" , m2 == "fp" = conflictFp Map.! (h1,h2)  --Do we want ((m,h),(m,h))? What is the conflict associated? 
 					   | m1 == m2 = (conflictOfEachPairInsideModule m1) Map.! (("this",h1),("this",h2))
 					   | m1 == "fp" = let listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2) in joins1 . map (\p-> conflict ((m1,h1),p)) $ listFps2
 					   | m2 == "fp" = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1) in joins1 . map (\p-> conflict (p,(m2,h2))) $ listFps1
 					   | otherwise  = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1)
 					 	 	      listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2)	
-							      in joins1 . map (\(p,q) -> conflict (p,q))$ (\x y -> [(x,y) | x <- xs, y <- ys]) listFps1 listFps2  
+							      in joins1 . map (\(p,q) -> conflict (p,q))$ (\xs ys -> [(x,y) | x <- xs, y <- ys]) listFps1 listFps2  
 		-- Todo : Check this piece of code
 		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
 		correspondingFp m1 = Map.fromList . zip (allFps m1) . head . instArgs . head . filter (\x->instName x == m1) . instances $ mod --hacky head 
