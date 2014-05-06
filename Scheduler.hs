@@ -40,16 +40,39 @@ instance JoinSemiLattice (Conflict) where
 	join SB CF = SB
 	join CF CF = CF
 
+{-
+data BoolExpr =  ETrue
+	| EFalse 
+	| EAnd [BoolExpr]
+	| ENot  BoolExpr
+	| EDynGuard String
 
-
-
+data Binding = Binding {bindName :: String
+	, bindSize :: Integer 
+	, bindExpr :: Expression
+} deriving(Show,Eq,Ord)--Done
+-}
 data PData = PData {fpNames :: [String]
 			, actualParametersForEachInst :: Map.Map String [String] 
 			, cM :: Map.Map ((String,String),(String,String)) Conflict }
 
 type PDatas = Map.Map String PData  --Data exported by each module compiled
+{-
+type Output = Output{ netlist :: [Binding]
+		, scheduler :: BoolExpr 
+		}
 
 
+builtScheduler :: BoolExpr -> [Binding] -> [Binding]
+builtScheduler expr bindings = case expr of
+	ETrue  -> [Binding{ bindName = 
+				, bindSize = 
+				, bindExpr =  }]
+	EFalse -> 
+	EAnd l ->
+	ENot e ->
+	EDynGuard s -> BInding
+-}
 compileAModule :: Module -> PDatas -> PDatas --This function add the information of compilation into the environnement of type PDatas
 compileAModule currentModule publicData =
 	let meths  = Set.fromList . map (\x->("this", methodName x)) . methods $ currentModule 
@@ -70,9 +93,10 @@ compileAModule currentModule publicData =
 				meths
 				fpsLoc
 				(methodsCalled env . (\x -> head . filter (\y -> ("this",methodName y) == x) $ methods currentModule))
-				$ conflictCalled 
-					(\x->  map (\under -> head under) . instArgs . head . filter (\i -> instName i == x) . instances $ currentModule)						
-					(fps currentModule)
+				$ conflictCalled
+					currentModule 
+					(\x ->  map (\under -> head under) . instArgs . head . filter (\i -> instName i == x) . instances $ currentModule)						
+					(\x -> fpNames $ publicData Map.! x)
 					(Set.union fpsLoc meths)
 					(conflictMatrix currentModule)
 					(Set.fold (\elem acc -> Map.insert elem (fpUsedByMethod (\x y -> (actualParametersForEachInst $ publicData Map.! x) Map.! y )
@@ -141,14 +165,15 @@ fpUsedByMethod actualFps allFps meth mod =
 --TODO : this function can be updated to a Fixpoint trick
 --
 
-conflictCalled :: (String -> [(String,String)]) --actual fps instances -> list of methods 
-		-> [ Fp ]  --fps
+conflictCalled :: Module
+		-> (String -> [(String,String)]) --actual fps instances -> list of methods 
+		-> (String -> [String])  --fps
 		-> Set.Set (String,String)    --Methods called
 		->  Map.Map (String, String) Conflict --conflict between FPs
-		-> Map.Map (String,String) [String] -> -- fp of each method internally
-		 (String -> Map.Map ((String,String),(String,String)) Conflict) -- conflict inside instances
+		-> Map.Map (String,String) [String]  -- fp of each method internally
+		-> (String -> Map.Map ((String,String),(String,String)) Conflict) -- conflict inside instances
 		-> Map.Map ((String,String),(String,String)) Conflict 
-conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflictOfEachPairInsideModule = --Do we want ((m,h),(m,h))? What is the conflict associated? 
+conflictCalled mod actualFps allFps calles conflictFp fpOfEachMethodInternally conflictOfEachPairInsideModule = --Do we want ((m,h),(m,h))? What is the conflict associated? 
 	Set.fold
 		(\(m1,h1) acc1 -> Set.fold
 					(\(m2,h2) acc2 ->  Map.insert 
@@ -166,10 +191,10 @@ conflictCalled actualFps fps calles conflictFp fpOfEachMethodInternally conflict
 					   | m2 == "fp" = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1) in joins1 . map (\p-> conflict (p,(m2,h2))) $ listFps1
 					   | otherwise  = let listFps1 = toActualFp m1 $ fpOfEachMethodInternally Map.! (m1,h1)
 					 	 	      listFps2 = toActualFp m2 $ fpOfEachMethodInternally Map.! (m2,h2)	
-							      in joins1 . map (\(p,q) -> conflict (p,q))$ zip listFps1 listFps2  
+							      in joins1 . map (\(p,q) -> conflict (p,q))$ (\x y -> [(x,y) | x <- xs, y <- ys]) listFps1 listFps2  
 		-- Todo : Check this piece of code
 		toActualFp m1 l = map (\x-> (correspondingFp m1) Map.! x) l
-		correspondingFp mod = Map.fromList . zip (map (\x -> fpName x) fps) $ actualFps mod
+		correspondingFp m1 = Map.fromList . zip (allFps m1) . head . instArgs . head . filter (\x->instName x == m1) . instances $ mod --hacky head 
 
 
 
