@@ -23,6 +23,98 @@ import qualified Text.ParserCombinators.Parsec.Token as P
 --Lexer and Parsers of the ATS language 
 --
 
+
+data Expression = Renaming String
+	| SConst String
+	| And String String
+	| Or String String
+	| Not String
+	| Mux String String String
+	| RShift String String 
+	| LShift String String
+	| Extract String String String 
+	| MCall MExpression --The same
+	| Equal String String
+	| Concat [String] --Concat wires
+	| Plus String String
+	| Sext String
+	| BNot String
+	| Times String String
+	| Divide String String
+	| Modulus String String
+	| Lt String String
+	| Gt String String 
+	| LtEq String String
+	| GtEq String String 
+	| ULt String String
+	| UGt String String
+	| PrimBuildArray [String]
+	| PrimArrayDynSelect String String 
+	| ULtEq String String
+	| UGtEq String String 
+	| BAnd String String
+	| BOr String String 
+	| BXor String String
+	| NotEqual String String
+	| Minus String String
+	| R3Shift String String
+	| L3Shift String String
+	deriving(Show,Eq,Ord)
+
+data Module = Module { name :: String
+	, instances :: [ Instance ]
+	, bindings :: [ Binding ]
+	, rules :: [ Rule ]
+	, methods :: [ Method ]
+	, fps :: [ Fp ]
+	, fpConflict :: Map.Map (String, String) Conflict 
+	, priorityList :: [ [ (String,String) ] ]
+} deriving(Show,Eq,Ord)--Done
+
+data Instance = Instance {instName :: String
+	, instModule :: String
+	, instArgs :: [[ (String,String) ]] --hacky
+} deriving(Show,Eq,Ord)--Done
+
+data Binding = Binding {bindName :: String
+	, bindSize :: Integer 
+	, bindExpr :: Expression
+} deriving(Show,Eq,Ord)--Done
+
+data Rule = Rule {ruleName :: String
+	, ruleGuard :: String 
+	, ruleBody :: [ MExpression ]
+} deriving(Show,Eq,Ord)--Done
+
+
+data Method = Method {methodName :: String
+	, methodGuard :: String 
+	, methodType :: TypeOfMethod  
+	, methodArgs :: [(String, Integer)]
+	, methodBody :: [ MExpression ]
+} deriving(Show,Eq,Ord) --Done
+
+data Fp = Fp {fpName :: String
+	, fpType :: TypeOfMethod
+	, fpArgs :: [ (String,Integer) ]
+} deriving(Show,Eq,Ord)
+
+-- Unit operations in the body of a method.
+data MExpression = MExpression {calledCond :: Maybe String 
+	, calledModule :: String
+	, calledMethod :: String 
+	, calledArgs :: [ String ]
+} deriving(Show,Eq,Ord)--Done 
+
+
+--The integers are the size of the result
+data TypeOfMethod = Value Integer  
+	| Value0 Integer
+	| Action
+	| ActionValue Integer
+	deriving(Show,Eq,Ord)
+--
+
 lexer = P.makeTokenParser defn
 
 defn = P.LanguageDef {
