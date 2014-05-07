@@ -12,6 +12,7 @@ type FpName = String
 
 data Conflict =  C | CF | SB | SA deriving(Show,Eq,Ord)
 
+{-
 data Op
   = None
   | SConst
@@ -117,4 +118,4 @@ data ModuleIfc = ModuleIfc
 
 type ModuleIfcs = Map.Map String ModuleIfc
 
-
+-}
