@@ -103,15 +103,42 @@ module mkSb(Scoreboard#(16));
   Scoreboard#(16) sb <- mkCFScoreboard;
   return sb;
 endmodule
+
+interface MkProcFp;
+  method Action t1(Bool x);
+  method Bit#(32) t2(Bool x, Bit#(32) y);
+  method ActionValue#(Bit#(32)) t3(Bit#(3) y, Bool x);
+endinterface
+
 // Defines the Processor module, with a synthesis boundary, ie a verilog file is created for this module
+import "BVI"
+module mkProc_fp(MkProcFp);
+  method t1(t11) enable (t2_en);
+  method t2_ret t2(t21, t22);
+  method t3_ret t3(t31, t32) enable(t3_en);
+  schedule t1 CF t1;
+  schedule t1 CF t2;
+  schedule t1 CF t3;
+  schedule t2 CF t1;
+  schedule t2 C t2;
+  schedule t2 SB t3;
+  schedule t3 CF t1;
+  //schedule t3 SA t2;
+  schedule t3 C t3;
+endmodule
+
+
 (* synthesize *)
 module mkProc(Proc);
 
   //Instantiating all the state elements of the processor.
 
+  (* doc = "[r1 r2] [b1] [rf.rd1 rf.rd2]"*)
+  let fp <- mkProc_fp;
   let sb <- mkSb;
 
   // Architectural State
+  (* doc = "rf.rd2 rf.rd1" *)
   Reg#(Addr) pc <- mkRegU;
   RFile      rf <- mkRFile;
   Memory    mem <- mkMemory;

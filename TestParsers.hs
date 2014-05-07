@@ -14,108 +14,12 @@ import Debug.Trace
 import Text.Parsec hiding (token)
 import Text.Parsec.String
 import Text.Parsec.Prim
-
+import DataTypes
 
 import qualified Text.ParserCombinators.Parsec.Token as P
 
---
--- DataTypes : It's the output of the parser
-
-
 --AST of ATS
 
-data Expression = Renaming String
-	| SConst String
-	| And String String
-	| Or String String
-	| Not String
-	| Mux String String String
-	| RShift String String 
-	| LShift String String
-	| Extract String String String 
-	| MCall MExpression --The same
-	| Equal String String
-	| Concat [String] --Concat wires
-	| Plus String String
-	| Sext String
-	| BNot String
-	| Times String String
-	| Divide String String
-	| Modulus String String
-	| Lt String String
-	| Gt String String 
-	| LtEq String String
-	| GtEq String String 
-	| ULt String String
-	| UGt String String
-	| PrimBuildArray [String]
-	| PrimArrayDynSelect String String 
-	| ULtEq String String
-	| UGtEq String String 
-	| BAnd String String
-	| BOr String String 
-	| BXor String String
-	| NotEqual String String
-	| Minus String String
-	| R3Shift String String
-	| L3Shift String String
-	deriving(Show,Eq,Ord)
-
-data Module = Module { name :: String
-	, instances :: [ Instance ]
-	, bindings :: [ Binding ]
-	, rules :: [ Rule ]
-	, methods :: [ Method ]
-	, fps :: [ Fp ]
-	, conflictMatrix :: Map.Map (String, String) Conflict 
-	, priorityList :: [ [ (String,String) ] ]
-} deriving(Show,Eq,Ord)--Done
-
-data Conflict =  C | CF | SB | SA deriving(Show,Eq,Ord)
-
-data Instance = Instance {instName :: String
-	, instModule :: String
-	, instArgs :: [[ (String,String) ]] --hacky
-} deriving(Show,Eq,Ord)--Done
-
-data Binding = Binding {bindName :: String
-	, bindSize :: Integer 
-	, bindExpr :: Expression
-} deriving(Show,Eq,Ord)--Done
-
-data Rule = Rule {ruleName :: String
-	, ruleGuard :: String 
-	, ruleBody :: [ MExpression ]
-} deriving(Show,Eq,Ord)--Done
-
-
-data Method = Method {methodName :: String
-	, methodGuard :: String 
-	, methodType :: TypeOfMethod  
-	, methodArgs :: [(String, Integer)]
-	, methodBody :: [ MExpression ]
-} deriving(Show,Eq,Ord) --Done
-
-data Fp = Fp {fpName :: String
-	, fpType :: TypeOfMethod
-	, fpArgs :: [ (String,Integer) ]
-} deriving(Show,Eq,Ord)
-
--- Unit operations in the body of a method.
-data MExpression = MExpression {calledCond :: Maybe String 
-	, calledModule :: String
-	, calledMethod :: String 
-	, calledArgs :: [ String ]
-} deriving(Show,Eq,Ord)--Done 
-
-
---The integers are the size of the result
-data TypeOfMethod = Value Integer  
-	| Value0 Integer
-	| Action
-	| ActionValue Integer
-	deriving(Show,Eq,Ord)
---
 --Lexer and Parsers of the ATS language 
 --
 
@@ -195,7 +99,7 @@ moduleParser = do
 			, rules = listRules
 			, methods = listMethods
 			, fps = if null l then []  else (\(x,y,z)->x).head $ l
-			, conflictMatrix = if null l then Map.empty else (\(x,y,z)->z).head $ l
+			, fpConflict = if null l then Map.empty else (\(x,y,z)->z).head $ l
 			, priorityList = if null l then [] else (\(x,y,z)->y).head $ l} 
 
 
