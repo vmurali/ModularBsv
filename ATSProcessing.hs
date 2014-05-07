@@ -16,6 +16,7 @@ import Text.Parsec hiding (token)
 import Text.Parsec.String
 import Text.Parsec.Prim
 
+import DataTypes
 --import Scheduler --For tests
 
 
@@ -53,7 +54,7 @@ ehr = Module
 	, methods = (map (\x -> ehrRead{methodName = methodName ehrRead ++ show x}) ehrList) ++
 	            (map (\x -> ehrWrite{methodName = methodName ehrWrite ++ show x}) ehrList)
 	, fps = []
-	, conflictMatrix = constructCf "w" "r" SA
+	, fpConflict = constructCf "w" "r" SA
 				(constructCf "r" "w" SB
 					(constructCf "w" "w" C
 						(constructCf "r" "r" CF Map.empty)))
