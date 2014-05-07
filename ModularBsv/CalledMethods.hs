@@ -54,9 +54,9 @@ getBindingCaller mod c b n cond =
     Expr op args = bindExpr $ bindings mod ! b
     foldAll args = concatMap (\x -> getBindingCaller mod c x n cond) args
 
-getSingleCall :: Module -> CalledMethod -> String -> ThisName -> [Calleds] ->
+getBindingCall :: Module -> CalledMethod -> String -> ThisName -> [Calleds] ->
                  [(RuleName, String, [ArgName])]
-getSingleCall mod c guard rlName calleds =
+getBindingCall mod c guard rlName calleds =
   getBindingCaller mod c guard rlName "1\'b1" ++ (concat $ do
     Calleds cond meth args <- calleds
     if meth == c
@@ -69,12 +69,12 @@ getSingleCall mod c guard rlName calleds =
 getRulesCaller :: Module -> CalledMethod -> [(RuleName, String, [ArgName])]
 getRulesCaller mod c = concat $ do
   (rlName, Rule guard calleds) <- toList $ rules mod
-  return $ getSingleCall mod c guard rlName calleds
+  return $ getBindingCall mod c guard rlName calleds
 
 getMethodsCaller :: Module -> CalledMethod -> [(DefinedMethod, String, [ArgName])]
 getMethodsCaller mod c = concat $ do
   (rlName, Method _ _ calleds) <- toList $ methods mod
-  return $ getSingleCall mod c ("RDY_" ++ rlName) rlName calleds
+  return $ getBindingCall mod c ("RDY_" ++ rlName) rlName calleds
 
 getBothCaller :: Module -> CalledMethod -> [(ThisName, String, [ArgName])]
 getBothCaller mod c = getRulesCaller mod c ++ getMethodsCaller mod c
