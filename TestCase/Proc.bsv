@@ -113,7 +113,7 @@ endinterface
 // Defines the Processor module, with a synthesis boundary, ie a verilog file is created for this module
 import "BVI"
 module mkProc_fp(MkProcFp);
-  method t1(t11) enable (t2_en);
+  method t1(t11) enable (t2_en) ready (t2_rdy);
   method t2_ret t2(t21, t22);
   method t3_ret t3(t31, t32) enable(t3_en);
   schedule t1 CF t1;
@@ -325,6 +325,7 @@ module mkProc(Proc);
     let dInst = decode(inst);
     let nextAddr <- handleDecodeRedirect(ex2dRedirect, dirPredRedirect, dInst, pc, ppc, fdEpoch, feEpoch);
 
+    fp.t1(True);
     if(isValid(nextAddr))
     begin
       d2rf.enq(Decode2RegRead{pc: pc, ppc: validValue(nextAddr), epoch: feEpoch, dInst: dInst});

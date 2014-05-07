@@ -1,7 +1,7 @@
 .PHONY: all clean
 
 all:
-	bsc -u -verilog -dATS -aggressive-conditions TestBench.bsv | grep -v '\->' | grep -v "compiling " | grep -v "checking package dependencies" | grep -v "code generation for" | grep -v "Verilog file created:" | grep -v "All packages are up to date" | grep -v "\<clock\>" | grep -v "\<reset\>" | grep -v "\<CLK\>" | grep -v "\<RST\>" | grep -v "\<RST_N\>" | grep -v "\<clockarg\>" | grep -v "\<resetarg\>" | grep -v "\<wire info\>" | grep -v "\<APackage resets\>" | grep -v "APackage parameters" | grep -v "APackage arguments" | grep -v '\-\- IdProp\>' > output
+	bsc -u -verilog -dATS -aggressive-conditions TestBench.bsv | grep -v '\->' | grep -v "compiling " | grep -v "checking package dependencies" | grep -v "code generation for" | grep -v "Verilog file created:" | grep -v "All packages are up to date" | grep -v "\<wire info\>" | grep -v "\<APackage resets\>" | grep -v "APackage parameters" | grep -v "APackage arguments" | grep -v '\-\- IdProp\>' > output
 
 clean:
 	rm -f output *.bo *.v
