@@ -12,6 +12,7 @@ type FpName = String
 
 data Conflict =  C | CF | SB | SA deriving(Show,Eq,Ord)
 
+{-
 data Op
   = None
   | Unary String
@@ -42,7 +43,6 @@ data Rule = Rule
   , ruleBody :: [ Calleds ]
   } deriving(Show,Eq,Ord)--Done
 
-{-
 type RuleName = String
 
 data Module = Module

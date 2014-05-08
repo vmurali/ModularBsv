@@ -16,7 +16,7 @@ import Algebra.Lattice  --SOOOO COOOL
 import ATSProcessing
 import TestParsers
 import Debug.Trace
-
+import DataTypes
 
 ---
 --- I love this stuff!
@@ -98,7 +98,7 @@ compileAModule currentModule publicData =
 					(\x ->  map (\under -> head under) . instArgs . head . filter (\i -> instName i == x) . instances $ currentModule)						
 					(\x -> fpNames $ publicData Map.! x)
 					(Set.union fpsLoc meths)
-					(conflictMatrix currentModule)
+					(fpConflict currentModule)
 					(Set.fold (\elem acc -> Map.insert elem (fpUsedByMethod (\x y -> (formalParametersForEachMethod $ publicData Map.! x) Map.! y )
 							      		(\x -> fpNames $ publicData Map.! x )
 							      		elem --methodname

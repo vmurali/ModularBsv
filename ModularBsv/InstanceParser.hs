@@ -113,11 +113,8 @@ instanceParser = do
                    sched <- parseSched;
                    (width, init) <- brackets $
                                do {
-                                 reserved "clock";
-                                 parseOscLine;
-                                 comma;
-                                 reserved "reset";
-                                 parseWireLine;
+                                 reserved "clock"; parseOscLine; comma;
+                                 reserved "reset"; parseWireLine;
                                  width <- option "" (do{comma; constant});
                                  init <- option "" (do{comma; constant});
                                  return (width, init)};
