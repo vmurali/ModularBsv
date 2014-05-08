@@ -17,16 +17,10 @@ schedulerBase ::
   -> [PriorityElem]
 schedulerBase modIfcs mod a =
   Prelude.foldl (\expr x ->
-                     if isDefMeth x
-                       then
-                         if (listPos a plist < listPos x plist && notOrder a x) ||
-                            (listPos a plist > listPos x plist && notOrder x a)
-                           then x:expr
-                           else expr
-                       else
-                         if (listPos a plist > listPos x plist && notOrder x a)
-                           then x:expr
-                           else expr)
+                    if (listPos a plist > listPos x plist && notOrder x a) ||
+                       (isDefMeth x && listPos a plist < listPos x plist && notOrder a x)
+                      then x:expr
+                      else expr)
                  [] (concat $ priorityList mod)
   where
     plist = priorityList mod
@@ -34,8 +28,9 @@ schedulerBase modIfcs mod a =
     isRule (m, h) = m == "this" && (member h $ rules mod)
     conflict x y = cmCalledMethods modIfcs mod (process x) (process y)
     process (m, h) = if not (isDefMeth (m, h)) && not (isRule (m, h))
-                       then fromList (zip (fpsInModule (modIfcs ! (instModule (instances mod ! m))))
-                                          (instArgs (instances mod ! m))) ! h
+                       then fromList
+                              (zip (fpsInModule (modIfcs ! (instModule (instances mod ! m))))
+                                   (instArgs (instances mod ! m))) ! h
                        else (m, h)
     notOrder a b = conflict a b /= SB && conflict a b /= CF
 
@@ -44,6 +39,7 @@ scheduler ::
   -> Module
   -> Map PriorityElem [PriorityElem]
 scheduler modIfcs mod =
-  Prelude.foldl (\acc x -> insert x (schedulerBase modIfcs mod x) acc) empty [x | x <- concat $ priorityList mod, not (isDefMeth x)]
+  Prelude.foldl (\acc x -> insert x (schedulerBase modIfcs mod x) acc)
+                empty [x | x <- concat $ priorityList mod, not (isDefMeth x)]
   where
     isDefMeth (m, h) = m == "this" && (member h $ methods mod)

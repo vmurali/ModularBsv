@@ -10,10 +10,7 @@ import CommentsParser
 import MethodParser
 import Data.Map
 
-moduleParser = do
-  symbol "=== ATS:"
-  symbol "APackage"
-  modName <- identifier
+moduleExtraParser = do
   symbol "[]"
   reserved "clock"
   braces $ do{reserved "osc"; reservedOp "="; identifier}
@@ -33,6 +30,12 @@ moduleParser = do
   brackets $ parens (do{integer; comma; parseWireLine})
   symbol "-- AP state elements"
   symbol "[]"
+
+moduleParser = do
+  symbol "=== ATS:"
+  symbol "APackage"
+  modName <- identifier
+  moduleExtraParser
   insts' <- many instanceParser
   symbol "-- AP local definitions"
   bindings'' <- many bindingParser
