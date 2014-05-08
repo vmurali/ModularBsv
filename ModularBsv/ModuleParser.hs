@@ -49,4 +49,34 @@ moduleParser = do
 
 modulesParser = do
   ms <- many moduleParser
-  return [m | m <- ms, drop ((length $ moduleName m) - 3) (moduleName m) /= "_fp"]
+  return $ ehr:[m | m <- ms, drop ((length $ moduleName m) - 3) (moduleName m) /= "_fp"]
+
+ehrList = [0..5]
+
+ehr = Module
+  { moduleName = "mkEhr"
+  , instances = empty
+  , bindings = empty
+  , rules = empty
+  , methods = fromList ([("r" ++ show x, ehrRead) | x <- ehrList] ++
+                        [("w" ++ show x, ehrWrite) | x <- ehrList])
+  , fps = empty
+  , fpConflict = fromList
+      ([(("r", "r"), if x < y then SB else if x == y then CF else SA)| x <- ehrList, y <- ehrList] ++
+       [(("r", "w"), if x <= y then SB else SA)| x <- ehrList, y <- ehrList] ++
+       [(("w", "r"), if x < y then SB else SA)| x <- ehrList, y <- ehrList] ++
+       [(("w", "w"), if x < y then SB else if x == y then C else SA)| x <- ehrList, y <- ehrList])
+  , priorityList = []
+  }
+
+ehrRead = Method
+	{ methodType = Value 0
+	, methodArgs = []
+	, methodBody = []
+	}
+
+ehrWrite = Method
+	{ methodType = Action
+	, methodArgs = [("x", 0)]
+	, methodBody = []
+	}
