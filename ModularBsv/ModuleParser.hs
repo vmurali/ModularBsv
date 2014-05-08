@@ -39,9 +39,9 @@ moduleParser = do
   symbol "-- AP instance comments"
   priorityList <- priorityParser
   instArgs <- many instArgsParser
-  let insts = fromList [(name, Inst modName undefined undefined args)
-                        | ((name, modName, _, _), (_, args)) <- tail . tail $ zip insts' instArgs]
-  let (_, _, conflict, fps) = head insts'
+  let insts = fromList [(name, Inst modName width init args)
+                        | ((name, modName, _, width, init, _), (_, args)) <- tail . tail $ zip insts' instArgs]
+  let (_, _, conflict, _, _, fps) = head insts'
   symbol "-- AP remaining proof obligations"
   symbol "[]"
   symbol "-----"

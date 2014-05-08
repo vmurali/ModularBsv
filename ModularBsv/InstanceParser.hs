@@ -83,9 +83,15 @@ inverseConf conf =
 
 getConflict scheds = fromList $
   [((x, y), conf) | (xs, ys, conf) <- scheds,
-                     x <- xs, y <- ys] ++
+                     x <- xs, y <- ys, take 4 x /= "RDY_", take 4 y /= "RDY_"] ++
   [((y, x), inverseConf conf) | (xs, ys, conf) <- scheds,
-                                 x <- xs, y <- ys]
+                                 x <- xs, y <- ys, take 4 x /= "RDY_", take 4 y /= "RDY_"]
+
+parseClockLine = do
+  reserved "clock"; identifier;
+  parens (do{identifier; comma; symbol "{-"; identifier; symbol "-}"});
+  reserved "reset"; identifier;
+  parens (do{identifier; comma; reserved "clocked_by"; parens identifier});
 
 instanceParser = do
   name <- identifier
@@ -93,14 +99,28 @@ instanceParser = do
   sepBy identifier dot
   reserved "="
   modName <- identifier
-  (meths, sched) <-
+  (meths, sched, width, init) <-
      parens $ do { reserved "VModInfo"; identifier;
-                   meths <- braces (sepBy (do{x <-instMethParser; semi; return x}) comma);
+                   parseClockLine;
+                   brackets (sepBy (do{identifier; identifier; semi}) comma);
+                   meths <- braces (sepBy (do{x <- instMethParser; semi; instMethParser; semi; return x}) comma);
                    sched <- parseSched;
-                   return (meths, sched)}
+                   (width, init) <- brackets $
+                               do {
+                                 reserved "clock";
+                                 braces (do{reserved "osc"; colon; identifier; reserved "gate"; colon; constant});
+                                 comma;
+                                 reserved "reset";
+                                 braces (do{reserved "wire"; colon; identifier});
+                                 comma;
+                                 width <- constant;
+                                 comma;
+                                 init <- constant;
+                                 return (width, init)};
+                   return (meths, sched, width, init)}
   symbol "[]"
   methTypes <- instMethTypeParser
-  return $ (name, modName, getConflict sched, fromList
+  return $ (name, modName, getConflict sched, width, init, fromList
     [ (name, if isEn
                then case retSize of
                       Just size -> Fp (ActionValue size) (zip args argSize)
