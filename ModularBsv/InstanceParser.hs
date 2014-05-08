@@ -118,10 +118,8 @@ instanceParser = do
                                  comma;
                                  reserved "reset";
                                  parseWireLine;
-                                 comma;
-                                 width <- constant;
-                                 comma;
-                                 init <- constant;
+                                 width <- option "" (do{comma; constant});
+                                 init <- option "" (do{comma; constant});
                                  return (width, init)};
                    return (meths, sched, width, init)}
   symbol "[]"

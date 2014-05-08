@@ -25,6 +25,6 @@ ruleParser = do
   reserved "when"
   guard <- terminal
   reservedOp "==>"
-  mcalls <- braces (sepBy mcallParser colon)
+  mcalls <- braces (many $ do {x <- mcallParser; semi; return x})
   symbol "[]"
   return (name, Rule guard mcalls)
