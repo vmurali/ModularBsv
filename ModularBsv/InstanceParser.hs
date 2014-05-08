@@ -90,8 +90,14 @@ getConflict scheds = fromList $
 parseClockLine = do
   reserved "clock"; identifier;
   parens (do{identifier; comma; symbol "{-"; identifier; symbol "-}"});
+
+parseResetLine = do
   reserved "reset"; identifier;
   parens (do{identifier; comma; reserved "clocked_by"; parens identifier});
+
+parseOscLine = braces (do{reserved "osc"; colon; identifier; reserved "gate"; colon; constant})
+
+parseWireLine = braces (do{reserved "wire"; colon; identifier});
 
 instanceParser = do
   name <- identifier
@@ -101,17 +107,17 @@ instanceParser = do
   modName <- identifier
   (meths, sched, width, init) <-
      parens $ do { reserved "VModInfo"; identifier;
-                   parseClockLine;
+                   parseClockLine; parseResetLine;
                    brackets (sepBy (do{identifier; identifier; semi}) comma);
                    meths <- braces (sepBy (do{x <- instMethParser; semi; instMethParser; semi; return x}) comma);
                    sched <- parseSched;
                    (width, init) <- brackets $
                                do {
                                  reserved "clock";
-                                 braces (do{reserved "osc"; colon; identifier; reserved "gate"; colon; constant});
+                                 parseOscLine;
                                  comma;
                                  reserved "reset";
-                                 braces (do{reserved "wire"; colon; identifier});
+                                 parseWireLine;
                                  comma;
                                  width <- constant;
                                  comma;

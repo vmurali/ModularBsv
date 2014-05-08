@@ -14,6 +14,23 @@ moduleParser = do
   symbol "=== ATS:"
   symbol "APackage"
   modName <- identifier
+  symbol "[]"
+  reserved "clock"
+  braces $ do{reserved "osc"; reservedOp "="; identifier}
+  reserved "reset"
+  braces identifier
+  reserved "clock"
+  reserved "info"
+  parseClockLine
+  reserved "reset"
+  reserved "info"
+  parseResetLine
+  reserved "arg"
+  reserved "info"
+  brackets $ do{reserved "clockarg"; identifier; semi; comma; reserved "reset"; identifier; semi}
+  symbol "-- APackage clock domains"
+  brackets $ parens (do{integer; comma; brackets parseOscLine})
+  brackets $ parens (do{integer; comma; parseWireLine})
   symbol "-- AP state elements"
   symbol "[]"
   insts' <- many instanceParser
