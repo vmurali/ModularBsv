@@ -81,7 +81,7 @@ ignoreTillCloseOpenReset = do
 parseSched = do
   reserved "SchedInfo"
   scheds <- brackets (sepBy schedStmtParser comma)
-  ignoreTillCloseOpenReset
+  count 4 (balanced '[' ']')
   return scheds
 
 inverseConf conf =
@@ -136,11 +136,6 @@ vmodInfoParser = do
 
 instanceParser = do
   name <- identifier
-
-  x <- getPosition
-  y <- lookAhead (count 20 anyChar)
-  trace (show x ++ show name) (return ())
-
   symbol "::"
   symbol "ABSTRACT"
   symbol ":"
@@ -151,6 +146,12 @@ instanceParser = do
   symbol "[]"
   methTypes <- instMethTypeParser
 --  optional (do{manyTill anyChar (try $ lookAhead (do{identifier; symbol ":: ABSTRACT:"}))})
+  many $ parens (count 2 (sepBy ((try identifier) <|> (integer>>return"")) dot)) 
+
+  x <- getPosition
+  y <- lookAhead (count 20 anyChar)
+  trace (show x ++ show name) (return ())
+
   return $ (name, modName, getConflict sched, width, init, sz, fromList
     [(name, if isEn
               then case retSize of

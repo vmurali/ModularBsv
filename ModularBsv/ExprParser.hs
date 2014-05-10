@@ -55,12 +55,13 @@ data NestedIdentifier a = Node [NestedIdentifier a]
   | Leaf a
   deriving(Show,Eq)
 
-nestedIdentifiers parserOfIdentifier = do
-  nextNesting <- brackets . many $ (try (nestedIdentifiers parserOfIdentifier)) <|> fmap Leaf parserOfIdentifier
-  return $ Node nextNesting	
+nestedIdentifiers parserOfIdentifier open close = do
+  nextNesting <- (between open close) . many $
+      (try (nestedIdentifiers parserOfIdentifier open close)) <|> fmap Leaf parserOfIdentifier
+  return $ Node nextNesting
 
 balanced open close =  do
-  nestedIdentifiers $ noneOf [open, close]
+  nestedIdentifiers (noneOf [open, close]) (symbol [open]) (symbol [close])
   return ()
 
 concatParser = do
