@@ -142,7 +142,7 @@ module mkProc(Proc);
 
   //Instantiating all the state elements of the processor.
 
-  (* doc = "[r1 r2] [b1] [rf.rd1 rf.rd2]"*)
+  (* doc = "[this.r1 this.r2] [this.b1] [rf.rd1 rf.rd2]"*)
   let fp1 <- mkProc_fp;
   let fp2 <- mkProc_fp;
   let sb <- mkSb;

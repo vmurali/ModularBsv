@@ -43,7 +43,7 @@ quotedString = do
   return $ "\"" ++ xs ++ "\""
 
 typedIdentifier =
-  parens (symbol "_" *> option "0" (brackets identifier) <* symbol "::" <* symbol "Bit" <* integer)
+  parens (symbol "_" *> option "0" (brackets (try identifier <|> constant)) <* symbol "::" <* symbol "Bit" <* integer)
 
 terminal = try typedIdentifier <|> try quotedString <|>
            try identifier <|> constant

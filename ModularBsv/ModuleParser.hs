@@ -38,10 +38,6 @@ moduleParser = do
   modName <- identifier
   moduleExtraParser
 
-  x <- getPosition
-  y <- lookAhead (count 20 anyChar)
-  trace ("HELLO" ++ show x ++ show modName) (return ())
-
   insts' <- many $ try (instanceParser)
 
   symbol "-- AP local definitions"
@@ -64,16 +60,23 @@ moduleParser = do
                           (name, _, _, meth) <- methods']
   symbol "-- AP instance comments"
   priorityList <- priorityParser
-  instArgs' <- many $ try instArgsParser
+  instArgs' <- many instArgsComments
   let instArgs = fromList instArgs'
-  let insts = fromList [(name, Inst modName width init sz (instArgs ! name))
+  let insts = fromList [(name, Inst modName width init sz (findWithDefault [] name instArgs))
                         | (name, modName, _, width, init, sz, _) <- tail $ tail insts']
   let (_, _, conflict, _, _, _, fps) = head insts'
   symbol "-- AP remaining proof obligations"
   symbol "[]"
   symbol "-----"
-  trace (show modName) (return ())
+  do{x <- lookAhead (count 20 anyChar); y <- getPosition;
+     trace (show y ++ "[" ++ show instArgs ++ "]") (return ())}
   return $ Module modName insts bindings rules methods fps conflict priorityList
+
+instArgsComments = do
+  id <- identifier
+  colon
+  args <- many $ do {x <- identifier; dot; y <- identifier; return (x, y)}
+  return (id, args)
 
 modulesParser = do
   ms <- many $ try moduleParser-- <*
