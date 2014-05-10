@@ -162,8 +162,7 @@ instanceParser = do
              x <- getPosition;
              y <- lookAhead (count 20 anyChar);
              trace ("cc" ++ show b ++ show x ++ show name) (return ());
-             symbol ")";
-             f <- symbol "(";
+             f <- symbol ")";
              x <- getPosition;
              y <- lookAhead (count 20 anyChar);
              trace ("ff" ++ show f ++ show x ++ show name) (return ())})
