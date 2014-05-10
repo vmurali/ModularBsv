@@ -26,9 +26,9 @@ wordParser = do
   return $ Expr (Word op) ids
 
 -- MUST TODO THIS
-concatParser = do
-  ids <- sepBy1 terminal (reservedOp "++")
-  return $ Expr (Word "concat") ids
+--concatParser = do
+--  ids <- sepBy1 terminal (reservedOp "++")
+--  return $ Expr (Word "concat") ids
 
 methCallParser = do
   (name, args) <- finalMCallParser
@@ -50,3 +50,26 @@ bindingParser = do
   reservedOp "="
   expr <- exprParser
   return $ (name, Binding array size expr)
+
+data NestedIdentifier a = Node [NestedIdentifier a]
+  | Leaf a
+  deriving(Show,Eq)
+
+nestedIdentifiers parserOfIdentifier = do
+  nextNesting <- brackets . many $ (try (nestedIdentifiers parserOfIdentifier)) <|> fmap Leaf parserOfIdentifier
+  return $ Node nextNesting	
+
+balanced open close =  do
+  nestedIdentifiers $ noneOf [open, close]
+  return ()
+
+concatParser = do
+  treeOfIdentifiers <- noOuterParensConcat terminal 
+  return (Expr (Word "concat") $ process treeOfIdentifiers)
+  where
+    process (Leaf a) = [a]
+    process (Node l) = concatMap process l
+
+noOuterParensConcat parserOfIdentifier = fmap Node (sepBy (try (outerParensConcat parserOfIdentifier) <|> fmap Leaf parserOfIdentifier) $ symbol "++" )
+
+outerParensConcat parserOfIdentifier = parens $ noOuterParensConcat parserOfIdentifier
