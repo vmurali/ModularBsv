@@ -146,11 +146,33 @@ instanceParser = do
   symbol "[]"
   methTypes <- instMethTypeParser
 --  optional (do{manyTill anyChar (try $ lookAhead (do{identifier; symbol ":: ABSTRACT:"}))})
-  many $ parens (count 2 (sepBy ((try identifier) <|> (integer>>return"")) dot)) 
+  x <- getPosition
+  y <- lookAhead (count 20 anyChar)
+  trace ("bb" ++ show x ++ show name) (return ())
+
+  many $ (do{
+             x <- getPosition;
+             y <- lookAhead (count 20 anyChar);
+             trace ("dd" ++ show x ++ show name) (return ());
+             a <- symbol "(";
+             x <- getPosition;
+             y <- lookAhead (count 20 anyChar);
+             trace ("ee" ++ show a ++ show x ++ show name) (return ());
+             b <- count 2 (sepBy ((try identifier) <|> (integer>>return"")) dot);
+             x <- getPosition;
+             y <- lookAhead (count 20 anyChar);
+             trace ("cc" ++ show b ++ show x ++ show name) (return ());
+             symbol ")";
+             f <- symbol "(";
+             x <- getPosition;
+             y <- lookAhead (count 20 anyChar);
+             trace ("ff" ++ show f ++ show x ++ show name) (return ())})
+
+  --lexeme (many $ parens (noneOf "()"))
 
   x <- getPosition
   y <- lookAhead (count 20 anyChar)
-  trace (show x ++ show name) (return ())
+  trace ("aa" ++ show x ++ show name) (return ())
 
   return $ (name, modName, getConflict sched, width, init, sz, fromList
     [(name, if isEn
