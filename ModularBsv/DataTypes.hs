@@ -26,7 +26,7 @@ data Binding = Binding
   { bindArray :: Maybe Integer
   , bindSize :: Integer 
   , bindExpr :: Expr
-  } deriving(Show,Eq,Ord)--Done
+  } deriving(Show, Eq,Ord)--Done
 
 data Calleds = Calleds
   { calledCond :: String 
