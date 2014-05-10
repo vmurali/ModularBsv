@@ -153,19 +153,19 @@ instanceParser = do
   many $ (do{
              x <- getPosition;
              y <- lookAhead (count 20 anyChar);
-             trace ("dd" ++ show x ++ show name) (return ());
+             trace ("dd" ++ show x ++ show y) (return ());
              a <- symbol "(";
              x <- getPosition;
              y <- lookAhead (count 20 anyChar);
-             trace ("ee" ++ show a ++ show x ++ show name) (return ());
-             b <- count 2 (sepBy ((try identifier) <|> (integer>>return"")) dot);
+             trace ("ee" ++ show a ++ show x ++ show y) (return ());
+             a <- count 2 (sepBy ((try identifier) <|> (integer>>return"")) dot);
              x <- getPosition;
              y <- lookAhead (count 20 anyChar);
-             trace ("cc" ++ show b ++ show x ++ show name) (return ());
-             f <- symbol ")";
+             trace ("cc" ++ show a ++ show x ++ show y) (return ());
+             a <- symbol ")";
              x <- getPosition;
              y <- lookAhead (count 20 anyChar);
-             trace ("ff" ++ show f ++ show x ++ show name) (return ())})
+             trace ("ff" ++ show a ++ show x ++ show y) (return ())})
 
   --lexeme (many $ parens (noneOf "()"))
 
