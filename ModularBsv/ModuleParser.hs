@@ -62,8 +62,11 @@ moduleParser = do
   priorityList <- priorityParser
   instArgs' <- many instArgsComments
   let instArgs = fromList instArgs'
+  let insts'' = if (insts' /= [] && let (nm, _, _, _, _, _, _) = head insts' in nm == "fp1")
+                  then tail $ tail insts'
+                  else insts'
   let insts = fromList [(name, Inst modName width init sz (findWithDefault [] name instArgs))
-                        | (name, modName, _, width, init, sz, _) <- tail $ tail insts']
+                        | (name, modName, _, width, init, sz, _) <- insts'']
   let (_, _, conflict, _, _, _, fps) = head insts'
   symbol "-- AP remaining proof obligations"
   symbol "[]"
@@ -80,10 +83,18 @@ instArgsComments = do
 
 modulesParser = do
   ms <- many $ try moduleParser
-  trace (show $ (priorityList (ms !! 3))) (return ())
-  --trace ("\n\n\n\n\n\n") (return ())
-  return ()
-  --return $ ehr:[m | m <- ms, drop ((length $ moduleName m) - 3) (moduleName m) /= "_fp"]
+  return $ ehr : regFile : ms
+
+regFile = Module
+  { moduleName = "mkRegFile"
+  , instances = empty
+  , bindings = empty
+  , rules = empty
+  , methods = fromList [("sub", Method (Value 0) [("x", 0)] []), ("upd", Method Action [("x", 0), ("y", 0)] [])]
+  , fps = empty
+  , fpConflict = fromList [(("sub", "sub"), C), (("upd", "upd"), C), (("sub", "upd"), SB), (("upd", "sub"), SA)]
+  , priorityList = []
+  }
 
 ehrList = [0..3]
 
@@ -92,8 +103,8 @@ ehr = Module
   , instances = empty
   , bindings = empty
   , rules = empty
-  , methods = fromList ([("r" ++ show x, ehrRead) | x <- ehrList] ++
-                        [("w" ++ show x, ehrWrite) | x <- ehrList])
+  , methods = fromList ([("r" ++ show x, Method (Value 0) [] []) | x <- ehrList] ++
+                        [("w" ++ show x, Method Action [("x", 0)] []) | x <- ehrList])
   , fps = empty
   , fpConflict = fromList
       ([(("r" ++ show x, "r" ++ show y), if x < y then SB else if x == y then CF else SA)| x <- ehrList, y <- ehrList] ++
@@ -102,15 +113,3 @@ ehr = Module
        [(("w" ++ show x, "w" ++ show y), if x < y then SB else if x == y then C else SA)| x <- ehrList, y <- ehrList])
   , priorityList = []
   }
-
-ehrRead = Method
-	{ methodType = Value 0
-	, methodArgs = []
-	, methodBody = []
-	}
-
-ehrWrite = Method
-	{ methodType = Action
-	, methodArgs = [("x", 0)]
-	, methodBody = []
-	}
