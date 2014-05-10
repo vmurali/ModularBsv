@@ -80,7 +80,10 @@ instArgsComments = do
 
 modulesParser = do
   ms <- many $ try moduleParser
-  return $ ehr:[m | m <- ms, drop ((length $ moduleName m) - 3) (moduleName m) /= "_fp"]
+  trace (show $ (priorityList (ms !! 3))) (return ())
+  --trace ("\n\n\n\n\n\n") (return ())
+  return ()
+  --return $ ehr:[m | m <- ms, drop ((length $ moduleName m) - 3) (moduleName m) /= "_fp"]
 
 ehrList = [0..3]
 
