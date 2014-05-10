@@ -71,8 +71,6 @@ moduleParser = do
   symbol "-- AP remaining proof obligations"
   symbol "[]"
   symbol "-----"
-  do{x <- lookAhead (count 20 anyChar); y <- getPosition;
-     trace (show y ++ "[" ++ show instArgs ++ "]") (return ())}
   return $ Module modName insts bindings rules methods fps conflict priorityList
 
 instArgsComments = do
