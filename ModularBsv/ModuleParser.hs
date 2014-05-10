@@ -79,9 +79,8 @@ instArgsComments = do
   return (id, args)
 
 modulesParser = do
-  ms <- many $ try moduleParser-- <*
-  return (ms)
---  return $ ehr:[m | m <- ms, drop ((length $ moduleName m) - 3) (moduleName m) /= "_fp"]
+  ms <- many $ try moduleParser
+  return $ ehr:[m | m <- ms, drop ((length $ moduleName m) - 3) (moduleName m) /= "_fp"]
 
 ehrList = [0..3]
 
