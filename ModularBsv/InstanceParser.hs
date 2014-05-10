@@ -145,30 +145,7 @@ instanceParser = do
   (meths, sched, width, init, sz) <- vmodInfoParser
   symbol "[]"
   methTypes <- instMethTypeParser
---  optional (do{manyTill anyChar (try $ lookAhead (do{identifier; symbol ":: ABSTRACT:"}))})
-
   many (balanced '(' ')')
-{-
-  many $ (do{
-             x <- getPosition;
-             y <- lookAhead (count 20 anyChar);
-             trace ("dd" ++ show x ++ show y) (return ());
-             a <- symbol "(";
-             x <- getPosition;
-             y <- lookAhead (count 20 anyChar);
-             trace ("ee" ++ show a ++ show x ++ show y) (return ());
-             a <- count 2 (sepBy ((try identifier) <|> (integer>>return"")) dot);
-             x <- getPosition;
-             y <- lookAhead (count 20 anyChar);
-             trace ("cc" ++ show a ++ show x ++ show y) (return ());
-             a <- symbol ")";
-             x <- getPosition;
-             y <- lookAhead (count 20 anyChar);
-             trace ("ff" ++ show a ++ show x ++ show y) (return ())})
--}
-
-  --lexeme (many $ parens (noneOf "()"))
-
   return $ (name, modName, getConflict sched, width, init, sz, fromList
     [(name, if isEn
               then case retSize of
