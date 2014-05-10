@@ -3,6 +3,7 @@ module ExprParser where
 import Text.Parsec
 import Lexer
 import DataTypes
+import Debug.Trace
 
 noneParser = do
   id <- terminal
@@ -21,9 +22,10 @@ binaryParser = do
 
 wordParser = do
   op <- terminal
-  ids <- many1 terminal
+  ids <- many1 $ try terminal
   return $ Expr (Word op) ids
 
+-- MUST TODO THIS
 concatParser = do
   ids <- sepBy1 terminal (reservedOp "++")
   return $ Expr (Word "concat") ids

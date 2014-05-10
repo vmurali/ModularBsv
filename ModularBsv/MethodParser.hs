@@ -7,6 +7,8 @@ import ExprParser
 import RuleParser
 import InstanceParser
 
+import Debug.Trace
+
 headerParser = do
   symbol "-- AP"
   symbol "apkg_interface def"
@@ -20,7 +22,7 @@ methodArgParser = do
   semi
   return (name, size)
 
-methodArgsParser = many methodArgParser
+methodArgsParser = many $ try methodArgParser
 
 commonBeginMethodParser symb = do
   headerParser
@@ -32,8 +34,10 @@ commonBeginMethodParser symb = do
 commonEndMethodParser = do
   reserved "pred"
   colon
-  identifier
+  (try constant) <|> identifier
+  symbol "clock domain = Just (0), resets = [0]"
   instMethParser
+  semi
 
 simpleValueParser = do
   (name, args') <- commonBeginMethodParser "--AIDef"
@@ -49,6 +53,7 @@ actionParser = do
   (name, args) <- commonBeginMethodParser "--AIAction"
   reservedOp "["
   (_, Rule _ body) <- ruleParser
+  symbol "]"
   commonEndMethodParser
   (_, _, _, guard) <- simpleValueParser
   return (name, guard, undefined, Method Action args body)
@@ -67,6 +72,7 @@ actionValueParser = do
   expr <- exprParser
   reservedOp "["
   (_, Rule _ body) <- ruleParser
+  symbol "]"
   commonEndMethodParser
   (_, _, _, guard) <- simpleValueParser
   return (name, guard, expr, Method (ActionValue size) args body)

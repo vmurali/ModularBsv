@@ -3,10 +3,11 @@ module RuleParser where
 import Text.Parsec
 import Lexer
 import DataTypes
+import Debug.Trace
 
 mcallIfParser = do
   reserved "if"
-  cond <- identifier
+  cond <- (try constant) <|> identifier
   reserved "then"
   (name, args) <- finalMCallParser
   return $ Calleds cond name args
@@ -27,4 +28,5 @@ ruleParser = do
   reservedOp "==>"
   mcalls <- braces (many $ do {x <- mcallParser; semi; return x})
   symbol "[]"
+  symbol "clock domain = Just (0), resets = [0]"
   return (name, Rule guard mcalls)

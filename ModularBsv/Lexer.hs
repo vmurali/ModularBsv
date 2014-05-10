@@ -10,7 +10,7 @@ lexer = P.makeTokenParser defn
 
 defn = emptyDef {
   P.identStart = letter <|> oneOf "_$",
-  P.identLetter = alphaNum <|> oneOf "_$-"
+  P.identLetter = alphaNum <|> oneOf "_$"
 }
 
 --operator   = choice $ map string ["++","||","&&","+","-"]  --Operators supported 
@@ -52,7 +52,7 @@ finalMCallParser = do
   m <- identifier
   dot
   h <- identifier
-  args <- many terminal
+  args <- many $ try terminal
   return ((m,h), args)
 
 

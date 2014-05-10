@@ -61,8 +61,9 @@ data Fp = Fp
 
 data Inst = Inst
   { instModule :: ModuleName
-  , instWidth :: String
-  , instInit :: String
+  , instWidth :: Expr
+  , instInit :: Expr
+  , instSize :: Expr
   , instArgs :: [CalledMethod]
   } deriving(Show,Eq,Ord)
 

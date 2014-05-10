@@ -5,21 +5,26 @@ import Text.Parsec
 import Lexer
 import DataTypes
 import Data.Map
+import Debug.Trace
+import ExprParser
+import Control.Applicative hiding ((<|>), optional, many)
+import qualified Text.ParserCombinators.Parsec.Prim as P
 
 -- TODO : Take care of EHRs, width, initial value - requires changing the parser slightly
+
 
 instArgParser = parens $ do
   name <- identifier
   comma
-  symbol "[]"
+  brackets $ optional identifier
   return name
 
 instMethParser = do
   reserved "method"
   optional instArgParser
   name <- identifier
-  args <- parens (sepBy instArgParser comma)
-  optional (do{reserved "enable"; instArgParser})
+  args <- option [] $ ((try $ parens (sepBy instArgParser comma)) <|> (symbol "[0]" *> return []))
+  optional (do{reserved "enable"; parens instArgParser})
   reserved "clocked_by"
   parens identifier
   reserved "reset_by"
@@ -46,10 +51,11 @@ singleInstMethTypeParser = parens $ do
 
 instMethTypeParser = do
   reserved "meth"
-  reserved "type"
+  reserved "types"
   reservedOp "="
-  brackets $ do
+  x <- brackets $ do
     sepBy (singleInstMethTypeParser) comma
+  return x
 
 singleOrListParser =
   try (do{x <- identifier; return [x]}) <|>
@@ -58,6 +64,7 @@ singleOrListParser =
 conflictParser =
   try (do {reserved "CF"; return CF}) <|>
   try (do {reserved "SB"; return SB}) <|>
+  try (do {reserved "SBR"; return SB}) <|>
   try (do {reserved "C"; return C})
 
 schedStmtParser = do
@@ -66,12 +73,15 @@ schedStmtParser = do
   y <- singleOrListParser
   return (x, y, conf)
 
+ignoreTillCloseOpenReset = do
+  manyTill anyChar (try $ lookAhead (do{symbol ")"; symbol "["; 
+    try (do {reserved "reset"; symbol "{"; reserved "wire"}) <|>
+    (do {reserved "clock"; symbol "{"; reserved "osc"})}))
+
 parseSched = do
+  reserved "SchedInfo"
   scheds <- brackets (sepBy schedStmtParser comma)
-  symbol "[]"
-  symbol "[]"
-  symbol "[]"
-  symbol "[]"
+  ignoreTillCloseOpenReset
   return scheds
 
 inverseConf conf =
@@ -88,45 +98,65 @@ getConflict scheds = fromList $
                                  x <- xs, y <- ys, take 4 x /= "RDY_", take 4 y /= "RDY_"]
 
 parseClockLine = do
-  reserved "clock"; identifier;
-  parens (do{identifier; comma; symbol "{-"; identifier; symbol "-}"});
+  reserved "clock"
+  identifier
+  parens $ do
+    identifier
+    comma
+    (try $ do{symbol "{-"; identifier; symbol "-}"}) <|> identifier
+  semi
 
 parseResetLine = do
   reserved "reset"; identifier;
-  parens (do{identifier; comma; reserved "clocked_by"; parens identifier});
+  parens identifier; reserved "clocked_by"; parens identifier; semi;
 
 parseOscLine = braces (do{reserved "osc"; colon; identifier; reserved "gate"; colon; constant})
 
 parseWireLine = braces (do{reserved "wire"; colon; identifier});
 
+vmodInfoParser = do
+  (meths, sched) <- parens $ do
+    reserved "VModInfo"
+    identifier
+    parseClockLine
+    parseResetLine
+    brackets (sepBy (do{identifier; identifier; semi}) comma)
+    meths <- brackets (sepBy (instMethParser <* semi <* comma <* instMethParser <*
+        semi) comma)
+    sched <- parseSched
+    return (meths, sched)
+  (width, init, size) <- brackets $ do
+    try (reserved "clock" >> parseOscLine >> comma >> reserved "reset" >> parseWireLine) <|>
+      (reserved "reset" >> parseWireLine >> comma >> reserved "clock" >> parseOscLine)
+    width <- option (Expr None []) (try $ comma >> ((try concatParser) <|> noneParser))
+    init <- option (Expr None []) (try $ comma >> ((try concatParser) <|> noneParser))
+    size <- option (Expr None []) (try $ comma >> ((try concatParser) <|> noneParser))
+    return (width, init, size)
+  return (meths, sched, width, init, size)
+
 instanceParser = do
   name <- identifier
-  symbol ":: ABSTRACT:"
+
+  x <- getPosition
+  y <- lookAhead (count 20 anyChar)
+  trace (show x ++ show name) (return ())
+
+  symbol "::"
+  symbol "ABSTRACT"
+  symbol ":"
   sepBy identifier dot
-  reserved "="
+  symbol "="
   modName <- identifier
-  (meths, sched, width, init) <-
-     parens $ do { reserved "VModInfo"; identifier;
-                   parseClockLine; parseResetLine;
-                   brackets (sepBy (do{identifier; identifier; semi}) comma);
-                   meths <- braces (sepBy (do{x <- instMethParser; semi; instMethParser; semi; return x}) comma);
-                   sched <- parseSched;
-                   (width, init) <- brackets $
-                               do {
-                                 reserved "clock"; parseOscLine; comma;
-                                 reserved "reset"; parseWireLine;
-                                 width <- option "" (do{comma; constant});
-                                 init <- option "" (do{comma; constant});
-                                 return (width, init)};
-                   return (meths, sched, width, init)}
+  (meths, sched, width, init, sz) <- vmodInfoParser
   symbol "[]"
   methTypes <- instMethTypeParser
-  return $ (name, modName, getConflict sched, width, init, fromList
-    [ (name, if isEn
-               then case retSize of
-                      Just size -> Fp (ActionValue size) (zip args argSize)
-                      Nothing -> Fp Action (zip args argSize)
-               else case retSize of
-                      Just size -> Fp (Value size) (zip args argSize)
-                      Nothing -> Fp (Value 0) (zip args argSize))
+--  optional (do{manyTill anyChar (try $ lookAhead (do{identifier; symbol ":: ABSTRACT:"}))})
+  return $ (name, modName, getConflict sched, width, init, sz, fromList
+    [(name, if isEn
+              then case retSize of
+                     Just size -> Fp (ActionValue size) (zip args argSize)
+                     Nothing -> Fp Action (zip args argSize)
+              else case retSize of
+                     Just size -> Fp (Value size) (zip args argSize)
+                     Nothing -> Fp (Value 0) (zip args argSize))
       | ((name, args), (argSize, retSize, isEn)) <- zip meths methTypes])
