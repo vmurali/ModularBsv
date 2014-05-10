@@ -13,8 +13,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 import Types::*;
 import ProcTypes::*;
-import RegFile::*;
 import Vector::*;
+import Ehr::*;
 
 interface AddrPred;
   method Addr predPc(Addr pc);
@@ -35,8 +35,11 @@ typedef Bit#(TSub#(TSub#(AddrSz, TLog#(BtbEntries)), 2)) BtbTag;
 
 (* synthesize *)
 module mkBtb(AddrPred);
-  RegFile#(BtbIndex, Addr) arr <- mkRegFileFull;
-  RegFile#(BtbIndex, BtbTag) tagArr <- mkRegFileFull;
+  (* doc = "[hello.hello]" *)
+  Empty fp1 <- empty_fp;
+  Empty fp2 <- empty_fp;
+//  RegFile#(BtbIndex, Addr) arr <- mkRegFileFull;
+//  RegFile#(BtbIndex, BtbTag) tagArr <- mkRegFileFull;
   Vector#(BtbEntries, Reg#(Bool)) validArr <- replicateM(mkReg(False));
 
   function BtbIndex getIndex(Addr pc) = truncate(pc >> 2);
@@ -45,8 +48,8 @@ module mkBtb(AddrPred);
   method Addr predPc(Addr pc);
     BtbIndex index = getIndex(pc);
     BtbTag tag = getTag(pc);
-    if(validArr[index] && tag == tagArr.sub(index))
-      return arr.sub(index);
+    if(validArr[index] && tag == ?)
+      return ?;
     else
       return (pc + 4);
   endmethod
@@ -57,8 +60,8 @@ module mkBtb(AddrPred);
       let index = getIndex(rd.pc);
       let tag = getTag(rd.pc);
       validArr[index] <= True;
-      tagArr.upd(index, tag);
-      arr.upd(index, rd.nextPc);
+      //tagArr.upd(index, tag);
+      //arr.upd(index, rd.nextPc);
     end
   endmethod
 endmodule

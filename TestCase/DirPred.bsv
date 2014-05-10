@@ -14,6 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 import Types::*;
 import ProcTypes::*;
 import RegFile::*;
+import Ehr::*;
 
 interface DirPred;
   method Bool predDir(Addr pc);
@@ -26,15 +27,19 @@ typedef Bit#(TLog#(CounterPredEntries)) CounterPredIndex;
 
 (* synthesize *)
 module mkCounterPred2Bit(DirPred);
-  RegFile#(CounterPredIndex, Bit#(2)) counters <- mkRegFileFull;
-  RegFile#(CounterPredIndex, Maybe#(CounterPredTag)) tags <- mkRegFileFull;
+  (* doc = "[hello.hello]" *)
+  Empty fp1 <- empty_fp;
+  Empty fp2 <- empty_fp;
+
+  //RegFile#(CounterPredIndex, Bit#(2)) counters <- mkRegFileFull;
+  //RegFile#(CounterPredIndex, Maybe#(CounterPredTag)) tags <- mkRegFileFull;
 
   Reg#(Bit#(TLog#(TAdd#(CounterPredEntries, 1)))) initialize <- mkReg(0);
 
   Bool inited = truncateLSB(initialize) == 1'b1;
 
   rule init(!inited);
-    counters.upd(truncate(initialize), 0);
+    //counters.upd(truncate(initialize), 0);
     initialize <= initialize + 1;
   endrule
 
@@ -44,19 +49,19 @@ module mkCounterPred2Bit(DirPred);
   method Bool predDir(Addr pc) if(inited);
     let idx = getIdx(pc);
     let tag = getTag(pc);
-    if(Valid (tag) == tags.sub(idx))
-      return unpack(truncateLSB(counters.sub(idx)));
+    if(Valid (tag) == ?)//tags.sub(idx))
+      return unpack(0);//counters.sub(idx)));
     else
       return False;
   endmethod
 
   method Action update(Redirect rd) if(inited);
     let idx = getIdx(rd.pc);
-    tags.upd(idx, Valid (getTag(rd.pc)));
-    let cnt = counters.sub(idx);
-    if(rd.taken && cnt != maxBound)
+    //tags.upd(idx, Valid (getTag(rd.pc)));
+    let cnt = ?;//counters.sub(idx);
+    /*if(rd.taken && cnt != maxBound)
       counters.upd(idx, cnt+1);
     else if(!rd.taken && cnt != 0)
-      counters.upd(idx, cnt-1);
+      counters.upd(idx, cnt-1);*/
   endmethod
 endmodule

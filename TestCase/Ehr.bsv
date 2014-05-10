@@ -10,62 +10,108 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 */
 
-
-/*
-Comments: This EHR design generates the following scheduling constraints (forall i):
-forall j >= i, r[i] < w[j]
-forall j < i, r[i] > w[j]
-forall j > i, w[i] < w[j]
-w[i] conflicts with w[i]
-forall j, r[i] is conflict free with r[j]
-*/
-
-import Vector::*;
-import RWire::*;
-
 typedef  Vector#(n, Reg#(t)) Ehr#(numeric type n, type t);
 
-module mkEhr#(t init)(Ehr#(n, t)) provisos(Bits#(t, tSz));
-  Vector#(n, RWire#(t)) lat <- replicateM(mkUnsafeRWire);
-
-  Vector#(n, Vector#(n, RWire#(Maybe#(t)))) dummy <- replicateM(replicateM(mkUnsafeRWire));
-  Vector#(n, Reg#(Bool)) dummy2 <- replicateM(mkReg(True));
-
-  Reg#(t) rl <- mkReg(init);
-
-  Ehr#(n, t) r = newVector;
-
-  rule canon;
-    t upd = rl;
-    for(Integer i = 0; i < valueOf(n); i = i + 1)
-      if(lat[i].wget matches tagged Valid .x)
-        upd = x;
-    rl <= upd;
-  endrule
-
-  for(Integer i = 0; i < valueOf(n); i = i + 1)
-    r[i] = (interface Reg;
-              method Action _write(t x);
-                lat[i].wset(x);
-                dummy2[i] <= True;
-                for(Integer j = 0; j < i; j = j + 1)
-                  dummy[i][j].wset(lat[j].wget);
-              endmethod
-
-              method t _read;
-                t upd = rl;
-                Bool yes = True;
-                for(Integer j = i; j < valueOf(n); j = j + 1)
-                  yes = yes && dummy2[j];
-                for(Integer j = 0; j < i; j = j + 1)
-                begin
-                  if(lat[j].wget matches tagged Valid .x)
-                    upd = x;
-                end
-                return yes? upd : ?;
-              endmethod
-            endinterface);
-
-   return r;
+module empty_fp(Empty);
 endmodule
 
+interface EHR#(type t);
+  method t r0;
+  method t r1;
+  method t r2;
+  method t r3;
+  method Action w0(t x);
+  method Action w1(t x);
+  method Action w2(t x);
+  method Action w3(t x);
+endinterface
+
+import "BVI"
+module mkEHR#(t init)(EHR#(t)) provisos(Bits#(t, a__));
+  parameter width = valueOf(a__);
+  parameter init = pack(init);
+  method r0 r0;
+  method r1 r1;
+  method r2 r2;
+  method r3 r3;
+  method w0(w0) enable(w0en);
+  method w1(w1) enable(w1en);
+  method w2(w2) enable(w2en);
+  method w3(w3) enable(w3en);
+
+  schedule r0 SB (w0, r1, w1, r2, w2, r3, w3);
+  schedule r1 SB (w1, r2, w2, r3, w3);
+  schedule r2 SB (w2, r3, w3);
+  schedule r3 SB (w3);
+  schedule w0 SB (r1, w1, r2, w2, r3, w3);
+  schedule w1 SB (r2, w2, r3, w3);
+  schedule w2 SB (r3, w3);
+  schedule r0 CF r0;
+  schedule r1 CF r1;
+  schedule r2 CF r2;
+  schedule r3 CF r3;
+  schedule w0 C w0;
+  schedule w1 C w1;
+  schedule w2 C w2;
+  schedule w3 C w3;
+endmodule
+
+import Vector::*;
+
+module mkEhr#(t init)(Ehr#(n, t)) provisos(Bits#(t, tSz));
+  Ehr#(n, t) r = newVector;
+  EHR#(t) e <- mkEHR(init);
+
+  r[0] = (interface Reg;
+            method _write = e.w0;
+            method _read = e.r0;
+          endinterface);
+  r[1] = (interface Reg;
+            method _write = e.w1;
+            method _read = e.r1;
+          endinterface);
+//  r[2] = (interface Reg;
+//            method _write = e.w2;
+//            method _read = e.r2;
+//          endinterface);
+//  r[3] = (interface Reg;
+//            method _write = e.w3;
+//            method _read = e.r3;
+//          endinterface);
+  for(Integer i = 4; i < valueOf(n); i=i+1)
+  r[i] = (interface Reg;
+            method _write(x) = noAction;
+            method _read = ?;
+          endinterface);
+  return r;
+endmodule
+
+module mkReg#(t init)(Reg#(t)) provisos(Bits#(t, tSz));
+  EHR#(t) e <- mkEHR(init);
+  method _read = e.r0;
+  method _write = e.w0;
+endmodule
+
+module mkRegU(Reg#(t)) provisos(Bits#(t, tSz));
+  EHR#(t) e <- mkEHR(unpack(0));
+  method _read = e.r0;
+  method _write = e.w0;
+endmodule
+
+interface RegFile#(type idx, type t);
+  method t sub(idx i);
+  method Action upd(idx i, t v);
+endinterface
+
+import "BVI"
+module mkRegFile#(String init)(RegFile#(idx, t)) provisos(Bits#(t, tSz), Bits#(idx, sz));
+  parameter width = valueOf(tSz);
+  parameter init = init;
+  parameter size = 1<<valueOf(sz);
+  method sub0 sub(sub1);
+  method upd(upd0, upd1) enable(upden);
+
+  schedule sub C sub;
+  schedule sub SB upd;
+  schedule upd C upd;
+endmodule

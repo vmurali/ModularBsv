@@ -28,11 +28,14 @@ endinterface
 
 (* synthesize *)
 module mkCop(Cop);
-  Reg#(Bool) startReg <- mkConfigReg(False);
-  Reg#(Data) numInsts <- mkConfigReg(0);
-  Reg#(Data) timeReg <- mkConfigReg(?);
-  Reg#(Bool) finishReg <- mkConfigReg(False);
-  Reg#(Data) finishCode <- mkConfigReg(0);
+  (* doc = "[hello.hello]" *)
+  Empty fp1 <- empty_fp;
+  Empty fp2 <- empty_fp;
+  Reg#(Bool) startReg <- mkReg(False);
+  Reg#(Data) numInsts <- mkReg(0);
+  Reg#(Data) timeReg <- mkReg(0);
+  Reg#(Bool) finishReg <- mkReg(False);
+  Reg#(Data) finishCode <- mkReg(0);
 
   Fifo#(2, Tuple2#(RIndx, Data)) copFifo <- mkCFFifo;
 

@@ -16,6 +16,7 @@ import MemTypes::*;
 import Fifo::*;
 import RegFile::*;
 import Vector::*;
+import Ehr::*;
 
 interface Cache;
   method Action req(MemReq r);
@@ -33,9 +34,12 @@ typedef enum {Ready, StartMiss, SendFillReq, WaitFillResp} CacheStatus deriving 
 
 (* synthesize *)
 module mkCache(Cache);
-  RegFile#(CacheIndex, Line) dataArray <- mkRegFileFull;
-  RegFile#(CacheIndex, Maybe#(CacheTag)) tagArray <- mkRegFileFull;
-  RegFile#(CacheIndex, Bool) dirtyArray <- mkRegFileFull;
+  (* doc = "[hello.hello]" *)
+  Empty fp1 <- empty_fp;
+  Empty fp2 <- empty_fp;
+//  RegFile#(CacheIndex, Line) dataArray <- mkRegFileFull;
+//  RegFile#(CacheIndex, Maybe#(CacheTag)) tagArray <- mkRegFileFull;
+//  RegFile#(CacheIndex, Bool) dirtyArray <- mkRegFileFull;
 
   Reg#(Bit#(TLog#(TAdd#(CacheEntries, 1)))) init <- mkReg(0);
 
@@ -55,18 +59,18 @@ module mkCache(Cache);
 
   rule initialize(!inited);
     init <= init + 1;
-    tagArray.upd(truncate(init), Invalid);
-    dirtyArray.upd(truncate(init), False);
+    //tagArray.upd(truncate(init), Invalid);
+    //dirtyArray.upd(truncate(init), False);
   endrule
 
   rule startMiss(status == StartMiss);
     let idx = getIdx(miss.addr);
-    let tag = tagArray.sub(idx);
-    let dirty = dirtyArray.sub(idx);
+    let tag = ?;//tagArray.sub(idx);
+    let dirty = ?;//dirtyArray.sub(idx);
     if(isValid(tag) && dirty)
     begin
       let addr = {validValue(tag), idx, 2'b0};
-      let data = dataArray.sub(idx);
+      let data = ?;//dataArray.sub(idx);
       memReqQ.enq(MemReq{op: St, addr: addr, data: data});
       status <= SendFillReq;
     end
@@ -86,9 +90,9 @@ module mkCache(Cache);
     let idx = getIdx(miss.addr);
     let tag = getTag(miss.addr);
     let data = memRespQ.first;
-    dataArray.upd(idx, data);
-    tagArray.upd(idx, Valid (tag));
-    dirtyArray.upd(idx, False);
+    //dataArray.upd(idx, data);
+    //tagArray.upd(idx, Valid (tag));
+    //dirtyArray.upd(idx, False);
     hitQ.enq(data);
     memRespQ.deq;
     status <= Ready;
@@ -97,9 +101,9 @@ module mkCache(Cache);
   method Action req(MemReq r) if(status == Ready && inited);
     let idx = getIdx(r.addr);
     let tag = getTag(r.addr);
-    let currTag = tagArray.sub(idx);
+    let currTag = ?;//tagArray.sub(idx);
     let hit = Valid (tag) == currTag;
-    let data = dataArray.sub(idx);
+    let data = ?;//dataArray.sub(idx);
     if(r.op == Ld)
     begin
       if(hit)
@@ -116,8 +120,8 @@ module mkCache(Cache);
     begin
       if(hit)
       begin
-        dataArray.upd(idx, r.data);
-        dirtyArray.upd(idx, True);
+        //dataArray.upd(idx, r.data);
+        //dirtyArray.upd(idx, True);
       end
       else
       begin

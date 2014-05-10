@@ -11,9 +11,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 */
 
 
+import Ehr::*;
 import Types::*;
 import MemTypes::*;
-import RegFile::*;
+//import RegFile::*;
 import Fifo::*;
 
 interface Memory;
@@ -25,7 +26,11 @@ endinterface
 
 (* synthesize *)
 module mkMemory(Memory);
-  RegFile#(Bit#(26), Data) mem <- mkRegFileWCFLoad("memory.vmh", 0, maxBound);
+  (* doc = "[hello.hello]" *)
+  Empty fp1 <- empty_fp;
+  Empty fp2 <- empty_fp;
+  RegFile#(Bit#(26), Data) mem <- mkRegFile("memory.vmh");
+//  RegFile#(Bit#(26), Data) mem <- mkRegFileWCFLoad("memory.vmh", 0, maxBound);
 
   Fifo#(2, MemReq) iMemReqQ <- mkCFFifo;
   Fifo#(2, MemResp) iMemRespQ <- mkCFFifo;

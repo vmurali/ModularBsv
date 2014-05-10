@@ -48,9 +48,9 @@ endinterface
 // notFull < enq < clear < canon
 // deq conflict free with enq
 module mkCFFifo(Fifo#(2, t)) provisos(Bits#(t, tSz));
-  Ehr#(3, t) da <- mkEhr(?);
+  Ehr#(3, t) da <- mkEhr(unpack(0));
   Ehr#(3, Bool) va <- mkEhr(False);
-  Ehr#(3, t) db <- mkEhr(?);
+  Ehr#(3, t) db <- mkEhr(unpack(0));
   Ehr#(3, Bool) vb <- mkEhr(False);
 
   rule canon if(vb[2] && !va[2]);
@@ -117,7 +117,7 @@ endmodule
 // A bypass FIFO implementation
 // notFull < enq < {notEmpty, first} < deq < clear
 module mkBypassFifo(Fifo#(1, t)) provisos(Bits#(t, tSz));
-  Ehr#(2, t) data <- mkEhr(?);
+  Ehr#(2, t) data <- mkEhr(unpack(0));
   Ehr#(3, Bool) full <- mkEhr(False);
 
   method Bool notFull = !full[0];
@@ -157,7 +157,7 @@ module mkCFFifo(Fifo#(n, t)) provisos(Bits#(t, tSz), Add#(n, 1, n1), Log#(n1, sz
   Ehr#(3, Bit#(sz1)) deqP <- mkEhr(0);
   Ehr#(3, Bool) enqEn <- mkEhr(True);
   Ehr#(3, Bool) deqEn <- mkEhr(False);
-  Ehr#(2, t)                 tempData <- mkEhr(?);
+  Ehr#(2, t)                 tempData <- mkEhr(unpack(0));
   Ehr#(2, Maybe#(Bit#(sz1))) tempEnqP <- mkEhr(Invalid);
 
   rule canonicalize;
@@ -247,7 +247,7 @@ module mkBypassFifo(Fifo#(n, t)) provisos(Bits#(t, tSz), Add#(n, 1, n1), Log#(n1
   Integer ni = valueOf(n);
   Bit#(sz1) nb = fromInteger(ni);
   Bit#(sz1) n2 = 2*nb;
-  Vector#(n, Ehr#(2, t)) data <- replicateM(mkEhr(?));
+  Vector#(n, Ehr#(2, t)) data <- replicateM(mkEhr(unpack(0)));
   Ehr#(2, Bit#(sz1)) enqP <- mkEhr(0);
   Ehr#(2, Bit#(sz1)) deqP <- mkEhr(0);
 
@@ -303,7 +303,7 @@ module mkCFSFifo#(function Bool isFound(t v, st k))(SFifo#(n, t, st)) provisos(B
   Ehr#(3, Bit#(sz1)) deqP <- mkEhr(0);
   Ehr#(3, Bool) enqEn <- mkEhr(True);
   Ehr#(3, Bool) deqEn <- mkEhr(False);
-  Ehr#(2, t)                 tempData <- mkEhr(?);
+  Ehr#(2, t)                 tempData <- mkEhr(unpack(0));
   Ehr#(2, Maybe#(Bit#(sz1))) tempEnqP <- mkEhr(Invalid);
   Ehr#(2, Maybe#(Bit#(sz1))) tempDeqP <- mkEhr(Invalid);
 
@@ -439,7 +439,7 @@ module mkCFSCountFifo#(function Bool isFound(t v, st k))(SCountFifo#(n, t, st)) 
   Ehr#(3, Bit#(sz1)) deqP <- mkEhr(0);
   Ehr#(3, Bool) enqEn <- mkEhr(True);
   Ehr#(3, Bool) deqEn <- mkEhr(False);
-  Ehr#(2, t)                 tempData <- mkEhr(?);
+  Ehr#(2, t)                 tempData <- mkEhr(unpack(0));
   Ehr#(2, Maybe#(Bit#(sz1))) tempEnqP <- mkEhr(Invalid);
   Ehr#(2, Maybe#(Bit#(sz1))) tempDeqP <- mkEhr(Invalid);
 

@@ -10,7 +10,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 */
 
-
+import Ehr::*;
 /*
 The simulated machine:
 ISA: SMIPS with two co-processor registers (10, 21) for obtaining the stats and results of test programs. For more details, see Cop module
@@ -100,6 +100,9 @@ typedef struct {
 
 (* synthesize *)
 module mkSb(Scoreboard#(16));
+  (* doc = "[hello.hello]"*)
+  let fp1 <- empty_fp;
+  let fp2 <- empty_fp;
   Scoreboard#(16) sb <- mkCFScoreboard;
   return sb;
 endmodule
@@ -108,23 +111,29 @@ interface MkProcFp;
   method Action t1(Bool x);
   method Bit#(32) t2(Bool x, Bit#(32) y);
   method ActionValue#(Bit#(32)) t3(Bit#(3) y, Bool x);
+  method Bit#(31) t4;
 endinterface
 
 // Defines the Processor module, with a synthesis boundary, ie a verilog file is created for this module
 import "BVI"
 module mkProc_fp(MkProcFp);
-  method t1(t11) enable (t2_en) ready (t2_rdy);
-  method t2_ret t2(t21, t22);
-  method t3_ret t3(t31, t32) enable(t3_en);
+  method t1(t11) enable (t1_en) ready (t1_rdy);
+  method t2_ret t2(t21, t22) ready (t2_rdy);
+  method t3_ret t3(t31, t32) enable(t3_en) ready (t3_rdy);
+  method t4_ret t4 ready (t4_rdy);
   schedule t1 CF t1;
   schedule t1 CF t2;
   schedule t1 CF t3;
+  schedule t1 CF t4;
   schedule t2 CF t1;
   schedule t2 C t2;
   schedule t2 SB t3;
+  schedule t2 SB t4;
   schedule t3 CF t1;
   //schedule t3 SA t2;
   schedule t3 C t3;
+  schedule t3 C t4;
+  schedule t4 CF t4;
 endmodule
 
 
@@ -134,7 +143,8 @@ module mkProc(Proc);
   //Instantiating all the state elements of the processor.
 
   (* doc = "[r1 r2] [b1] [rf.rd1 rf.rd2]"*)
-  let fp <- mkProc_fp;
+  let fp1 <- mkProc_fp;
+  let fp2 <- mkProc_fp;
   let sb <- mkSb;
 
   // Architectural State
@@ -325,7 +335,7 @@ module mkProc(Proc);
     let dInst = decode(inst);
     let nextAddr <- handleDecodeRedirect(ex2dRedirect, dirPredRedirect, dInst, pc, ppc, fdEpoch, feEpoch);
 
-    fp.t1(True);
+    fp2.t1(True);
     if(isValid(nextAddr))
     begin
       d2rf.enq(Decode2RegRead{pc: pc, ppc: validValue(nextAddr), epoch: feEpoch, dInst: dInst});

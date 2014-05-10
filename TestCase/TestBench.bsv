@@ -13,7 +13,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 */
 
-
+import Ehr::*;
 import ProcTypes::*;
 import Proc::*;
 import Types::*;
@@ -22,6 +22,9 @@ typedef enum {Start, Run} State deriving (Bits, Eq);
 
 (* synthesize *)
 module mkTestBench();
+  (* doc = "[hello.hello]" *)
+  Empty fp1 <- empty_fp;
+  Empty fp2 <- empty_fp;
   Proc proc <- mkProc;
 
   Reg#(Bit#(32)) cycle <- mkReg(0);
