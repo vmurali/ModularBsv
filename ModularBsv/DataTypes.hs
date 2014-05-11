@@ -88,7 +88,7 @@ data Module = Module
 
 data ModuleIfc = ModuleIfc
   { fpsInModule :: [FpName]
-  , fpsForMethodInModule :: Map.Map DefinedMethod (Bool, [ArgName], [FpName])
+  , methodsInModule :: Map.Map DefinedMethod (Bool, [ArgName], [FpName])
   , cmForMethodsInModule :: Map.Map (DefinedMethod, DefinedMethod) Conflict
   } deriving (Show,Eq,Ord)
 

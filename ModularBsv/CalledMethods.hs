@@ -84,7 +84,7 @@ getCalledMethods modIfcs Module{instances = ins, fps = fs} = fromList $ instMeth
   where
     instMeths = do
       (x, y) <- toList ins
-      (name, (isV0, args, _)) <- toList $ fpsForMethodInModule (modIfcs ! instModule y)
+      (name, (isV0, args, _)) <- toList $ methodsInModule (modIfcs ! instModule y)
       return ((x, name), (isV0, args))
     fops = do
       (name, Fp typ xs) <- toList fs
