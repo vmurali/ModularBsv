@@ -27,7 +27,7 @@ toActualArgs ::
 toActualArgs moduleIfcs mod (m1, h1) =
   foldl (\acc x -> (fpsToArgs Map.! x) : acc) [] fpsMeth
   where
-    fpsMeth = (fpsForMethodInModule $ (moduleIfcs Map.! (instToModule mod m1))) Map.! h1
+    (_, _, fpsMeth) = (fpsForMethodInModule $ (moduleIfcs Map.! (instToModule mod m1))) Map.! h1
     fpsMod = fpsInModule (moduleIfcs Map.! (instToModule mod m1))
     fpsToArgs = Map.fromList $ zip fpsMod (instToArgs mod m1)
 
@@ -82,15 +82,3 @@ fpu moduleIfcs mod def =
     getFpus ((m, h) : xs)
       | m == "fp" || m == "fp1" || m == "fp2" = h : getFpus xs
       | otherwise = getFpus (toActualArgs moduleIfcs mod (m, h) ++ xs)
-
-getModuleIfc ::
-  ModuleIfcs
-  -> Module
-  -> ModuleIfc
-getModuleIfc modIfcs mod =
-  ModuleIfc
-    (Map.keys (fps mod))
-    (Map.fromList [(k, fpu modIfcs mod k) | k <- meths])
-    (Map.fromList [((k1, k2), fullCm modIfcs mod k1 k2) | k1 <- meths, k2 <- meths ])
-  where
-    meths = Map.keys $ methods mod

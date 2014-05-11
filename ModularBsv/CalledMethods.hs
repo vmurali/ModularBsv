@@ -78,3 +78,16 @@ getMethodsCaller mod c = concat $ do
 
 getBothCaller :: Module -> CalledMethod -> [(ThisName, String, [ArgName])]
 getBothCaller mod c = getRulesCaller mod c ++ getMethodsCaller mod c
+
+getCalledMethods :: ModuleIfcs -> Module -> Map CalledMethod (Bool, [ArgName])
+getCalledMethods modIfcs Module{instances = ins, fps = fs} = fromList $ instMeths ++ fops
+  where
+    instMeths = do
+      (x, y) <- toList ins
+      (name, (isV0, args, _)) <- toList $ fpsForMethodInModule (modIfcs ! instModule y)
+      return ((x, name), (isV0, args))
+    fops = do
+      (name, Fp typ xs) <- toList fs
+      return (("fp", name), (case typ of Value _ ->  xs == []
+                                         otherwise -> False,
+                             [x | (x, y) <- xs]))
