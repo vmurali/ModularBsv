@@ -57,8 +57,7 @@ main = do
   case (parse modulesParser "" input) of
     Left _ -> putStrLn "Error"
     Right mods -> do
-      --putStrLn $ show mods
       let modIfcs = Prelude.foldl (\acc m -> buildModuleIfc acc m) empty mods
-      putStrLn $ "\n\n\n\n---------------------------------------------------------------------------\n" ++ show [allInfo modIfcs x | x <- mods]
+      putStrLn $ show [calledMeth| x <- mods, let (name, binds, insts, fops, meths, calledMeth, sch) = allInfo modIfcs x]
       --putStrLn $ show modIfcs
       return ()

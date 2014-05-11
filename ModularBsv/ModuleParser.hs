@@ -67,7 +67,10 @@ moduleParser = do
                   else insts'
   let insts = fromList [(name, Inst modName width init sz (findWithDefault [] name instArgs))
                         | (name, modName, _, width, init, sz, _) <- insts'']
-  let (_, _, conflict, _, _, _, fps) = head insts'
+  let (_, _, conflict, _, _, _, fps) = if (insts' /= [] &&
+                                           let (nm, _, _, _, _, _, _) = head insts' in nm == "fp1")
+        then head insts'
+        else (undefined, undefined, empty, undefined, undefined, undefined, empty)
   symbol "-- AP remaining proof obligations"
   symbol "[]"
   symbol "-----"
