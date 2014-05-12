@@ -51,6 +51,7 @@ getBindingCaller ::
 getBindingCaller mod c b n cond = --trace ("final " ++ moduleName mod ++ "." ++ n ++ " " ++ show c ++ show b) $
   if member b (bindings mod)
     then
+     --trace ("EIFNE" ++ show b ++ show args) $
       case op of
         MethCall c' ->
           if c == c'
@@ -72,7 +73,7 @@ getBindingCall ::
   -> [(ThisName, String, [ArgName])]
 getBindingCall mod c guard rlName calleds = --trace ("stuff " ++ moduleName mod ++ "." ++ rlName ++ " " ++ show c) $
   getBindingCaller mod c guard rlName "1\'b1" ++
-  getBindingCaller mod c rlName rlName "1\'b1" ++
+  getBindingCaller mod c (rlName) rlName "1\'b1" ++
   (concat $
     [if meth == c
        then [(rlName, cond, args)] -- : concat [getBindingCaller mod c arg rlName cond | arg <- args]
@@ -80,7 +81,7 @@ getBindingCall mod c guard rlName calleds = --trace ("stuff " ++ moduleName mod 
      | Calleds cond meth args <- calleds])
 
 getRulesCaller :: Module -> CalledMethod -> [(RuleName, String, [ArgName])]
-getRulesCaller mod c = --traceId $ --trace ("Rule" ++ show (length (toList $ rules mod))) $
+getRulesCaller mod c = --trace ("Rule" ++ show (length (toList $ rules mod))) $
   concat
     [getBindingCall mod c guard rlName calleds | (rlName, Rule guard calleds) <- toList $ rules mod]
 

@@ -34,10 +34,13 @@ methCallParser = do
   (name, args) <- finalMCallParser
   return $ Expr (MethCall name) args
 
+-- Order is important
 exprParser =
   choice [try (do{val <- x; semi; return val}) |
-          x <- [noneParser, unaryParser, binaryParser,
-                wordParser, concatParser, methCallParser]]
+          x <- [methCallParser, concatParser, wordParser,
+                binaryParser, unaryParser]]
+--                noneParser, unaryParser, binaryParser,
+--                wordParser, concatParser, methCallParser]]
 
 bindingParser = do
   name <- identifier

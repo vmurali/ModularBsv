@@ -51,9 +51,9 @@ moduleParser = do
   symbol "-- AP interface"
   methods' <- many $ try methodParser
   let rdyBindings = [("RDY_" ++ name, Binding Nothing 1 guard) | (name, guard, _, _) <- methods']
-  let valueBindings = [("BODY_" ++ name, Binding Nothing size expr) |
+  let valueBindings = [(name, Binding Nothing size expr) |
                        (name, _, expr, Method (Value size) _ _) <- methods']
-  let avBindings = [("BODY_" ++ name, Binding Nothing size expr) |
+  let avBindings = [(name, Binding Nothing size expr) |
                     (name, _, expr, Method (ActionValue size) _ _) <- methods']
   let bindings = fromList $ bindings' ++ rdyBindings ++ valueBindings ++ avBindings
   let methods = fromList [(name, meth) |

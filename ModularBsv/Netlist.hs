@@ -9,6 +9,7 @@ import ModuleParser
 import Text.Parsec
 import Text.Parsec.String
 import Debug.Trace
+import qualified Data.List as L
 
 allInfo :: ModuleIfcs -> Module -> (ModuleName,
                                     Map BindName Binding,
@@ -59,15 +60,17 @@ buildModuleIfc modIfcs mod = let gMod = getModuleIfc modIfcs mod in
 main = do
   --filename <- getLine
   --parsed <- parseFromFile modulesParser filename
-  parsed <- parseFromFile modulesParser "../TestCase/output"
+  input <- getContents
+  let parsed = parse modulesParser "" input
   case (parsed) of
     Left _ -> putStrLn "Error"
     Right mods -> do
       let modIfcs = Prelude.foldl (\acc m -> buildModuleIfc acc m) empty mods
       let allInfos = [allInfo modIfcs x| x <- mods]
-      let calledms = [(calledm, f)| (name, _, _, _, _, f, calledms, _) <- allInfos, calledm <- keys calledms, name == "mkProc"]
-      --putStrLn $ show [getBothCaller mod ("hell", "heaven")| mod <- mods, moduleName mod == "mkProc"]
-      putStrLn $ show [f ("", "") | (x, f) <- calledms]
+      let fcalledms = [(name, f, calledms)| (name, _, _, _, _, f, calledms, _) <- allInfos]
+      let (fproc, cmsproc) = head [(f, calledms) | (name, f, calledms) <- fcalledms, name == "mkProc"]
+      putStrLn $ show $ length (keys cmsproc)
+      putStrLn $ show [(cm, fproc cm)| cm <- keys cmsproc]
       --putStrLn $ show $ ([(moduleName mod, getBothCaller mod ("thomas", "murali")) | mod <- mods])
       --putStrLn $ show (calledm1504, calledm1505, calledm1506)
       --putStrLn $ show (length calledms)
