@@ -10,18 +10,20 @@ prettyPrint (mName,
 		_,
 		_,
 		schedulerInf) =
-	List.foldl (\acc (n,bind) -> acc ++ prettyPrintBind (n,bind))   
+	List.foldl 
+		(\acc (n,bind) -> acc ++ prettyPrintBind (n,bind))   
 		[]
-		$ Map.toList mapBinds 
+		(Map.assocs mapBinds) 
 	++
-	List.foldl (\acc (n,l) -> acc ++ prettyPrintSched n l) 
+	List.foldl 
+		(\acc (n,l) -> acc ++ prettyPrintSched n l) 
 		[]
-		$ Map.toList schedulerInf 
+		(Map.assocs schedulerInf) 
 
 
 
-prettyPrintBind (bn, Binding ba bz bexpr) =
-  "wire " ++ bn ++ "[" ++ ba ++ "-1:0][" ++ bz ++ "-1:0]\nassign " ++ bn ++ " = " ++
+prettyPrintBind (bn, Binding ba bz bexpr) = --TODO : MAYBE INTEGER  
+  "wire " ++ bn ++ "[" ++ show ba ++ "-1:0][" ++ show bz ++ "-1:0]\nassign " ++ bn ++ " = " ++
   prettyPrintExp bexpr ++ "\n"
 
 
