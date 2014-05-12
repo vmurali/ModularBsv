@@ -15,7 +15,8 @@ prettyPrint (mName,
 		$ Map.assocs mapBinds)
 	++
 	concat (List.map 
-		(\n-> "wire "++ "RDY_"++n++";\n")
+		(\n-> "wire "++ "RDY_"++n++";\n"
+			++ "wire "++ "EN_"++n++";\n")
 		$ listRules)
 	++
 	concat (List.map 
