@@ -85,7 +85,7 @@ getRulesCaller mod c = --traceId $ --trace ("Rule" ++ show (length (toList $ rul
     [getBindingCall mod c guard rlName calleds | (rlName, Rule guard calleds) <- toList $ rules mod]
 
 getMethodsCaller :: Module -> CalledMethod -> [(DefinedMethod, String, [ArgName])]
-getMethodsCaller mod c = traceId $ --trace ("Method" ++ show (length (toList $ rules mod))) $
+getMethodsCaller mod c = --traceId $ --trace ("Method" ++ show (length (toList $ rules mod))) $
   concat
     [getBindingCall mod c ("RDY_" ++ rlName) rlName calleds
      | (rlName, Method _ _ calleds) <- toList $ methods mod]

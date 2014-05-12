@@ -65,12 +65,9 @@ main = do
     Right mods -> do
       let modIfcs = Prelude.foldl (\acc m -> buildModuleIfc acc m) empty mods
       let allInfos = [allInfo modIfcs x| x <- mods]
-      let calledms = [(calledm, f calledm)| (_, _, _, _, _, f, calledms, _) <- allInfos, calledm <- keys calledms]
+      let calledms = [(calledm)| (name, _, _, _, _, f, calledms, _) <- allInfos, calledm <- keys calledms, name == "mkProc"]
       --putStrLn $ show [getBothCaller mod ("hell", "heaven")| mod <- mods, moduleName mod == "mkProc"]
-      let (calledm1504, _) = calledms !! 1504
-      let (calledm1505, _) = calledms !! 1505
-      let (calledm1506, _) = calledms !! 1506
-      putStrLn $ show mods
+      putStrLn $ show calledms
       --putStrLn $ show $ ([(moduleName mod, getBothCaller mod ("thomas", "murali")) | mod <- mods])
       --putStrLn $ show (calledm1504, calledm1505, calledm1506)
       --putStrLn $ show (length calledms)
