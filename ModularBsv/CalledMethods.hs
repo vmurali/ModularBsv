@@ -2,6 +2,7 @@ module CalledMethods where
 
 import DataTypes
 import Data.Map as Map
+import Debug.Trace
 
 getCalled :: Module -> ThisName -> [CalledMethod]
 getCalled mod name =
@@ -31,50 +32,96 @@ getCalled mod name =
             return $ c1: getCalled mod x)
         else []
 
-getInstCaller :: Module -> CalledMethod -> [InstName]
+{-
+getInstCaller :: Module -> CalledMethod -> [(InstName, DefinedMethod)]
 getInstCaller mod c =
   Prelude.filter (\i -> elem c (instArgs (insts ! i))) instNames
   where
     insts = instances mod
     instNames = keys insts
+-}
 
-getBindingCaller :: Module -> CalledMethod -> BindName -> ThisName -> String ->
-                    [(ThisName, String, [ArgName])]
-getBindingCaller mod c b n cond =
+getBindingCaller ::
+  Module -- Module to search in
+  -> CalledMethod -- Method we want to search the bindings for
+  -> BindName -- The top-level binding name we are starting from for the search
+  -> ThisName -- The rule or method which calls the called method
+  -> String -- The condition under which the called method is called in the above rule or method
+  -> [(ThisName, String, [ArgName])]
+getBindingCaller mod c b n cond = trace 
+ (if c == ("bypassFromExec_data_0_e", "r0")
+    then "BAD" ++ moduleName mod
+    else if c == ("sb_f_tempEnqP_e","w3")
+           then "GOOD" ++ moduleName mod
+           else 
+             if c == ("sb_f_tempEnqP_e","w2")
+               then "GOOD2" ++ moduleName mod
+               else "" ++ moduleName mod
+ ) $
   if member b (bindings mod)
     then
       case op of
         MethCall c' ->
           if c == c'
-            then [(n, cond, args)]
-            else foldAll args
-        otherwise -> foldAll args
+            then (n, cond, args): foldAll
+            else foldAll
+        otherwise -> foldAll
     else []
   where
     Expr op args = bindExpr $ bindings mod ! b
-    foldAll args = concatMap (\x -> getBindingCaller mod c x n cond) args
-
-getBindingCall :: Module -> CalledMethod -> String -> ThisName -> [Calleds] ->
-                 [(RuleName, String, [ArgName])]
-getBindingCall mod c guard rlName calleds =
-  getBindingCaller mod c guard rlName "1\'b1" ++ (concat $ do
+    foldAll = concat [getBindingCaller mod c x n cond | x <- args]
+{-
+-- TODO : Search method return value bindings also
+getBindingCall ::
+  Module -- Module to search in
+  -> CalledMethod -- Method we want to search the bindings for
+  -> String -- The guard for the rule or method which calls the called method
+  -> ThisName -- The rule or method which calls the called method
+  -> [Calleds] -- The list of [if pred bindName] which is body of the calling method or rule
+  -> [(ThisName, String, [ArgName])]
+getBindingCall mod c guard rlName calleds = trace ("Call" ++ show c ++ show (length calleds)) $
+  getBindingCaller mod c guard rlName "1\'b1" ++
+  (concat $ do
     Calleds cond meth args <- calleds
     if meth == c
-      then return [(rlName, cond, args)]
+      then do
+        arg <- args
+        return $ (rlName, cond, args): getBindingCaller mod c arg rlName cond
       else do
         arg <- args
         return $ getBindingCaller mod c arg rlName cond)
+-}
 
+-- TODO : Search method return value bindings also
+getBindingCall ::
+  Module -- Module to search in
+  -> CalledMethod -- Method we want to search the bindings for
+  -> String -- The guard for the rule or method which calls the called method
+  -> ThisName -- The rule or method which calls the called method
+  -> [Calleds] -- The list of [if pred bindName] which is body of the calling method or rule
+  -> [(ThisName, String, [ArgName])]
+getBindingCall mod c guard rlName calleds = trace ("Call" ++ show c ++ show (length calleds)) $
+  getBindingCaller mod c guard rlName "1\'b1" ++
+  (concat $
+    [if meth == c
+       then (rlName, cond, args): concat [getBindingCaller mod c arg rlName cond | arg <- args]
+       else concat [getBindingCaller mod c arg rlName cond | arg <- args]
+     | Calleds cond meth args <- calleds])
 
+{-
 getRulesCaller :: Module -> CalledMethod -> [(RuleName, String, [ArgName])]
-getRulesCaller mod c = concat $ do
+getRulesCaller mod c = trace ("Rule" ++ show (length (toList $ rules mod))) $ concat $ do
   (rlName, Rule guard calleds) <- toList $ rules mod
   return $ getBindingCall mod c guard rlName calleds
+-}
+getRulesCaller :: Module -> CalledMethod -> [(RuleName, String, [ArgName])]
+getRulesCaller mod c = trace ("Rule" ++ show (length (toList $ rules mod))) $ concat
+  [getBindingCall mod c guard rlName calleds | (rlName, Rule guard calleds) <- toList $ rules mod]
 
 getMethodsCaller :: Module -> CalledMethod -> [(DefinedMethod, String, [ArgName])]
-getMethodsCaller mod c = concat $ do
-  (rlName, Method _ _ calleds) <- toList $ methods mod
-  return $ getBindingCall mod c ("RDY_" ++ rlName) rlName calleds
+getMethodsCaller mod c = trace ("Method" ++ show (length (toList $ rules mod))) $ concat
+  [getBindingCall mod c ("RDY_" ++ rlName) rlName calleds
+   | (rlName, Method _ _ calleds) <- toList $ methods mod]
 
 getBothCaller :: Module -> CalledMethod -> [(ThisName, String, [ArgName])]
 getBothCaller mod c = getRulesCaller mod c ++ getMethodsCaller mod c
