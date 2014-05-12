@@ -27,10 +27,6 @@ typedef Bit#(TLog#(CounterPredEntries)) CounterPredIndex;
 
 (* synthesize *)
 module mkCounterPred2Bit(DirPred);
-  (* doc = "[hello.hello]" *)
-  Empty fp1 <- empty_fp;
-  Empty fp2 <- empty_fp;
-
   //RegFile#(CounterPredIndex, Bit#(2)) counters <- mkRegFileFull;
   //RegFile#(CounterPredIndex, Maybe#(CounterPredTag)) tags <- mkRegFileFull;
 

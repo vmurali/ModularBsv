@@ -28,9 +28,6 @@ endinterface
 
 (* synthesize *)
 module mkCop(Cop);
-  (* doc = "[hello.hello]" *)
-  Empty fp1 <- empty_fp;
-  Empty fp2 <- empty_fp;
   Reg#(Bool) startReg <- mkReg(False);
   Reg#(Data) numInsts <- mkReg(0);
   Reg#(Data) timeReg <- mkReg(0);

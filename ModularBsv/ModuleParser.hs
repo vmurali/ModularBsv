@@ -11,6 +11,8 @@ import MethodParser
 import Data.Map
 import Debug.Trace
 import Control.Applicative hiding ((<|>), many, empty)
+import qualified Data.Set as Set
+import Data.List as List
 
 moduleExtraParser = do
   symbol "[]"
@@ -59,9 +61,11 @@ moduleParser = do
   let methods = fromList [(name, meth) |
                           (name, _, _, meth) <- methods']
   symbol "-- AP instance comments"
-  priorityList <- priorityParser
-  instArgs' <- many instArgsComments
-  let instArgs = fromList instArgs'
+  --priorityList' <- option [] priorityParser
+  instArgs'' <- many instArgsParser
+  let (priorityList'', instArgs') = List.partition (\(id, _) -> id == "fp1") instArgs''
+  let instArgs = fromList [(x, if y == [] then [] else head y)|(x, y) <- instArgs']
+  let priorityList' = if priorityList'' == [] then [] else let (_, vs) = head priorityList'' in vs
   let insts'' = if (insts' /= [] && let (nm, _, _, _, _, _, _) = head insts' in nm == "fp1")
                   then tail $ tail insts'
                   else insts'
@@ -74,13 +78,10 @@ moduleParser = do
   symbol "-- AP remaining proof obligations"
   symbol "[]"
   symbol "-----"
+  let flatList = Set.fromList $ concat priorityList'
+  let rulesMeths = keys rules ++ keys methods
+  let priorityList = priorityList' ++ [if Set.member ("this", x) flatList then [] else [("this", x)]| x <- rulesMeths ]
   return $ Module modName insts bindings rules methods fps conflict priorityList
-
-instArgsComments = do
-  id <- identifier
-  colon
-  args <- many $ do {x <- identifier; dot; y <- identifier; return (x, y)}
-  return (id, args)
 
 modulesParser = do
   ms <- many $ try moduleParser

@@ -26,9 +26,6 @@ endinterface
 
 (* synthesize *)
 module mkMemory(Memory);
-  (* doc = "[hello.hello]" *)
-  Empty fp1 <- empty_fp;
-  Empty fp2 <- empty_fp;
   RegFile#(Bit#(26), Data) mem <- mkRegFile("memory.vmh");
 //  RegFile#(Bit#(26), Data) mem <- mkRegFileWCFLoad("memory.vmh", 0, maxBound);
 
