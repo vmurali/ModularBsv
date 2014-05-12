@@ -37,7 +37,7 @@ prettyPrintInst (name,inst) =
 	(show $ instModule inst) ++
 	case (instWidth inst,instInit inst, instSize inst) of
 		(Expr None _ ,Expr None _ ,Expr None _ ) -> "\n" 
-		otherwise -> "#(" ++ (intercalate "," $ [show . instWidth, show . instInit , show . instSize] <*> [inst] ) ++")\n" 
+		otherwise -> "#(" ++ (intercalate "," $ [showExp . instWidth, showExp . instInit , showExp . instSize] <*> [inst] ) ++")\n" 
 	++ "("
 	++ intercalate
 		","
@@ -45,7 +45,11 @@ prettyPrintInst (name,inst) =
 			(\(x,y)-> x++"_"++y)
 			$ instArgs inst)
 	++ ")\n"
-
+	where
+		showExp (Expr _ l) = case l of
+			[] -> undefined
+			[a] -> show a 	 
+			otherwise -> "{"++intercalate "," l  ++ "}" 	
 
 
 
