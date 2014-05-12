@@ -1,30 +1,76 @@
 import DataTypes
 import Data.Map as Map
+import Data.Maybe as Maybe
 import Data.List as List
+import Control.Applicative
 
 prettyPrint (mName,
 		mapBinds,
-		_,
-		_,
-		_,
-		_,
-		_,
+		mapInsts,
+		listRules,
 		schedulerInf) =
-	List.foldl 
-		(\acc (n,bind) -> acc ++ prettyPrintBind (n,bind))   
-		[]
-		(Map.assocs mapBinds) 
+	"module" ++ mName ++ ";\n" ++	
+	concat (List.map 
+		(\(n,bind) -> prettyPrintBindW (n,bind))   
+		$ Map.assocs mapBinds)
 	++
-	List.foldl 
-		(\acc (n,l) -> acc ++ prettyPrintSched n l) 
-		[]
-		(Map.assocs schedulerInf) 
+	concat (List.map 
+		(\n-> "wire "++ "RDY_"++n++";\n"
+			++ "wire "++ "EN_"++n++";\n")
+		$ listRules)
+	++
+	concat (List.map 
+		(\(n,inst) -> prettyPrintInst (n,inst))   
+		$ Map.assocs mapInsts )
+	++
+	concat (List.map 
+		(\(n,bind) -> prettyPrintBindA (n,bind))   
+		$ Map.assocs mapBinds)
+	++
+	concat (List.map 
+		(\(n,l) -> prettyPrintSched n l) 
+		$ Map.assocs schedulerInf)
+	++"endmodule" 
 
 
 
-prettyPrintBind (bn, Binding ba bz bexpr) = --TODO : MAYBE INTEGER  
-  "wire " ++ bn ++ "[" ++ show ba ++ "-1:0][" ++ show bz ++ "-1:0]\nassign " ++ bn ++ " = " ++
-  prettyPrintExp bexpr ++ "\n"
+prettyPrintInst (name,inst) =
+	show name ++
+	" " ++
+	(show $ instModule inst) ++
+	case (instWidth inst,instInit inst, instSize inst) of
+		(Expr None _ ,Expr None _ ,Expr None _ ) -> "\n" 
+		otherwise -> "#(" ++ (intercalate "," . Maybe.catMaybes $ [showExp . instWidth, showExp . instInit , showExp . instSize] <*> [inst] ) ++")\n" 
+	++ "("
+	++ intercalate
+		","
+		(List.map 
+			(\(x,y)-> x++"_"++y)
+			$ instArgs inst)
+	++ ")\n"
+	where
+		showExp (Expr None l) = Nothing
+		showExp (Expr _ l) = Just $ case l of
+			[] -> undefined
+			[a] -> show a 	 
+			otherwise -> "{"++intercalate "," l  ++ "}" 	
+
+
+
+prettyPrintBindW (bn, Binding ba bz bexpr) = 
+  "wire " ++ bn ++ case ba of 
+			Nothing -> ""
+			Just 0 -> "" 
+			otherwise -> "[" ++ show ba ++ "-1:0]"
+  ++ case bz of
+	0 -> ""
+	otherwise -> "[" ++ show bz ++ "-1:0]"
+  ++ ";\n"
+
+
+prettyPrintBindA (bn, Binding ba bz bexpr) = 
+	"assign " ++ bn ++ " = " ++
+	prettyPrintExp bexpr ++ ";\n"
 
 
 prettyPrintExp (Expr op listArgs) = case op of 
@@ -39,9 +85,9 @@ prettyPrintSched (x,y) l =
 	intercalate
 		" && "
 		(List.map (\(a,b) -> "! (" ++ printTerm (a,b) ++ ")" ) l)	
-	++ "\n"
+	++ ";\n"
 	where
 		printTerm (a,b) = if a == "fp" || a == "this" 
-				then "EN_"++b else "EN_" ++ a ++ "_" ++ b 
+				then "EN_" ++ b else "EN_" ++ a ++ "_" ++ b 
 
 
