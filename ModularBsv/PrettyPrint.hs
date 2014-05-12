@@ -29,7 +29,8 @@ prettyPrint (mName,
 	++
 	concat (List.map 
 		(\(n,l) -> prettyPrintSched n l) 
-		$ Map.assocs schedulerInf) 
+		$ Map.assocs schedulerInf)
+	++"endmodule" 
 
 
 
@@ -63,12 +64,13 @@ prettyPrintBindW (bn, Binding ba bz bexpr) =
 			otherwise -> "[" ++ show ba ++ "-1:0]"
   ++ case bz of
 	0 -> ""
-	otherwise -> "[" ++ show bz ++ "-1:0]\n"
+	otherwise -> "[" ++ show bz ++ "-1:0]"
+  ++ ";\n"
 
 
 prettyPrintBindA (bn, Binding ba bz bexpr) = 
 	"assign " ++ bn ++ " = " ++
-	prettyPrintExp bexpr ++ "\n"
+	prettyPrintExp bexpr ++ ";\n"
 
 
 prettyPrintExp (Expr op listArgs) = case op of 
@@ -83,7 +85,7 @@ prettyPrintSched (x,y) l =
 	intercalate
 		" && "
 		(List.map (\(a,b) -> "! (" ++ printTerm (a,b) ++ ")" ) l)	
-	++ "\n"
+	++ ";\n"
 	where
 		printTerm (a,b) = if a == "fp" || a == "this" 
 				then "EN_" ++ b else "EN_" ++ a ++ "_" ++ b 
