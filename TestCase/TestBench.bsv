@@ -22,9 +22,6 @@ typedef enum {Start, Run} State deriving (Bits, Eq);
 
 (* synthesize *)
 module mkTestBench();
-  (* doc = "[hello.hello]" *)
-  Empty fp1 <- empty_fp;
-  Empty fp2 <- empty_fp;
   Proc proc <- mkProc;
 
   Reg#(Bit#(32)) cycle <- mkReg(0);

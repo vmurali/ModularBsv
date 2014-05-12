@@ -100,9 +100,6 @@ typedef struct {
 
 (* synthesize *)
 module mkSb(Scoreboard#(16));
-  (* doc = "[hello.hello]"*)
-  let fp1 <- empty_fp;
-  let fp2 <- empty_fp;
   Scoreboard#(16) sb <- mkCFScoreboard;
   return sb;
 endmodule
@@ -143,10 +140,8 @@ module mkProc(Proc);
   //Instantiating all the state elements of the processor.
 
   (* doc = "[this.r1 this.r2] [this.b1] [rf.rd1 rf.rd2]"*)
-  let fp1 <- empty_fp;
-  let fp2 <- empty_fp;
-  //let fp1 <- mkProc_fp;
-  //let fp2 <- mkProc_fp;
+  let fp1 <- mkProc_fp;
+  let fp2 <- mkProc_fp;
   let sb <- mkSb;
 
   // Architectural State

@@ -30,9 +30,6 @@ endinterface
 
  (* synthesize *)
 module mkRFile( RFile );
-  (* doc = "[hello.hello]" *)
-  Empty fp1 <- empty_fp;
-  Empty fp2 <- empty_fp;
     Vector#(32, Reg#(Data)) rfile <- replicateM(mkReg(0));
 
     function Data read(RIndx rindx);

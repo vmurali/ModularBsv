@@ -59,7 +59,7 @@ moduleParser = do
   let methods = fromList [(name, meth) |
                           (name, _, _, meth) <- methods']
   symbol "-- AP instance comments"
-  priorityList <- priorityParser
+  priorityList <- option [] priorityParser
   instArgs' <- many instArgsComments
   let instArgs = fromList instArgs'
   let insts'' = if (insts' /= [] && let (nm, _, _, _, _, _, _) = head insts' in nm == "fp1")

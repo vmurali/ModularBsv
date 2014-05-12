@@ -34,9 +34,6 @@ typedef enum {Ready, StartMiss, SendFillReq, WaitFillResp} CacheStatus deriving 
 
 (* synthesize *)
 module mkCache(Cache);
-  (* doc = "[hello.hello]" *)
-  Empty fp1 <- empty_fp;
-  Empty fp2 <- empty_fp;
 //  RegFile#(CacheIndex, Line) dataArray <- mkRegFileFull;
 //  RegFile#(CacheIndex, Maybe#(CacheTag)) tagArray <- mkRegFileFull;
 //  RegFile#(CacheIndex, Bool) dirtyArray <- mkRegFileFull;

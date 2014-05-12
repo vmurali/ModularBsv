@@ -35,9 +35,6 @@ typedef Bit#(TSub#(TSub#(AddrSz, TLog#(BtbEntries)), 2)) BtbTag;
 
 (* synthesize *)
 module mkBtb(AddrPred);
-  (* doc = "[hello.hello]" *)
-  Empty fp1 <- empty_fp;
-  Empty fp2 <- empty_fp;
 //  RegFile#(BtbIndex, Addr) arr <- mkRegFileFull;
 //  RegFile#(BtbIndex, BtbTag) tagArr <- mkRegFileFull;
   Vector#(BtbEntries, Reg#(Bool)) validArr <- replicateM(mkReg(False));
