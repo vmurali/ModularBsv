@@ -2,7 +2,7 @@ module DataTypes where
 import Debug.Trace
 import qualified Data.Map as Map
 
-traceId x = trace ("[" ++ show x ++ "]") x
+traceId x = trace (show x) x
 
 type ThisName = String
 type CalledMethod = (String, String)

@@ -4,34 +4,6 @@ import DataTypes
 import Data.Map as Map
 import Debug.Trace
 
-getCalled :: Module -> ThisName -> [CalledMethod]
-getCalled mod name =
-  if member name (bindings mod)
-    then
-      let Binding _ _ (Expr op strs) = bindings mod ! name in
-        (case op of
-           MethCall c1 -> [c1]
-           otherwise -> []
-        ) ++
-        concatMap (getCalled mod) strs
-    else if member name (rules mod)
-      then
-        let Rule guard calleds = rules mod ! name in
-          getCalled mod guard ++ (
-          concat $ do
-            Calleds cond c1 args <- calleds
-            x <- cond : args
-            return $ c1 : getCalled mod x)
-      else if member name (methods mod)
-        then
-          let Method _ _ calleds = methods mod ! name in
-          getCalled mod ("RDY_" ++ name) ++ (
-          concat $ do
-            Calleds cond c1 args <- calleds
-            x <- cond : args
-            return $ c1: getCalled mod x)
-        else []
-
 {-
 getInstCaller :: Module -> CalledMethod -> [(InstName, DefinedMethod)]
 getInstCaller mod c =
@@ -41,58 +13,65 @@ getInstCaller mod c =
     instNames = keys insts
 -}
 
+-- Collects the called methods and args in a binding
 getBindingCaller ::
   Module -- Module to search in
-  -> CalledMethod -- Method we want to search the bindings for
   -> BindName -- The top-level binding name we are starting from for the search
-  -> ThisName -- The rule or method which calls the called method
-  -> String -- The condition under which the called method is called in the above rule or method
-  -> [(ThisName, String, [ArgName])]
-getBindingCaller mod c b n cond = --trace ("final " ++ moduleName mod ++ "." ++ n ++ " " ++ show c ++ show b) $
+  -> [(CalledMethod, [ArgName])] -- The list of called methods + args in this call
+getBindingCaller mod b =
   if member b (bindings mod)
     then
-     --trace ("EIFNE" ++ show b ++ show args) $
       case op of
-        MethCall c' ->
-          if c == c'
-            then [(n, cond, args)] -- : foldAll
-            else foldAll
+        MethCall c -> (c, args): foldAll
         otherwise -> foldAll
     else []
   where
     Expr op args = bindExpr $ bindings mod ! b
-    foldAll = concat [getBindingCaller mod c x n cond | x <- args]
+    foldAll = concat [getBindingCaller mod x| x <- args]
 
--- TODO : Search method return value bindings also
+-- Creates a map from above function
+getBindingMap :: Module -> Map BindName [(CalledMethod, [ArgName])]
+getBindingMap mod = mapWithKey (\k _ -> getBindingCaller mod k) (bindings mod)
+
+-- Collects the called-method-map (with predicate and arguments) for a rule/method with guard, and body
 getBindingCall ::
   Module -- Module to search in
-  -> CalledMethod -- Method we want to search the bindings for
   -> String -- The guard for the rule or method which calls the called method
   -> ThisName -- The rule or method which calls the called method
   -> [Calleds] -- The list of [if pred bindName] which is body of the calling method or rule
-  -> [(ThisName, String, [ArgName])]
-getBindingCall mod c guard rlName calleds = --trace ("stuff " ++ moduleName mod ++ "." ++ rlName ++ " " ++ show c) $
-  getBindingCaller mod c guard rlName "1\'b1" ++
-  getBindingCaller mod c (rlName) rlName "1\'b1" ++
-  (concat $
-    [if meth == c
-       then [(rlName, cond, args)] -- : concat [getBindingCaller mod c arg rlName cond | arg <- args]
-       else concat [getBindingCaller mod c arg rlName cond | arg <- args]
-     | Calleds cond meth args <- calleds])
+  -> Map CalledMethod [(String, [ArgName])]
+getBindingCall mod guard rlName calleds =
+  fromListWith (++) $
+    [(guardMeth, [("1'b1", guardArgs)]) | member guard $ getBindingMap mod, (guardMeth, guardArgs) <- getBindingMap mod ! guard] ++
+    [(bodyMeth, [("1'b1", bodyArgs)]) | member rlName $ getBindingMap mod, (bodyMeth, bodyArgs) <- getBindingMap mod ! rlName] ++
+    concat [(meth, [(cond, args)]):[(m1, [(cond, a1)]) | (m1, a1) <- concat $ [getBindingMap mod ! arg | arg <- args, member arg $ getBindingMap mod]] | Calleds cond meth args <- calleds]
 
-getRulesCaller :: Module -> CalledMethod -> [(RuleName, String, [ArgName])]
-getRulesCaller mod c = --trace ("Rule" ++ show (length (toList $ rules mod))) $
-  concat
-    [getBindingCall mod c guard rlName calleds | (rlName, Rule guard calleds) <- toList $ rules mod]
+-- Creates a map for each rule (the above map)
+getBindingRules :: Module -> Map RuleName (Map CalledMethod [(String, [ArgName])])
+getBindingRules mod = mapWithKey (\k _ -> getBindingCall mod (ruleGuard $ rules mod ! k) k (ruleBody $ rules mod ! k)) (rules mod)
 
-getMethodsCaller :: Module -> CalledMethod -> [(DefinedMethod, String, [ArgName])]
-getMethodsCaller mod c = --traceId $ --trace ("Method" ++ show (length (toList $ rules mod))) $
-  concat
-    [getBindingCall mod c ("RDY_" ++ rlName) rlName calleds
-     | (rlName, Method _ _ calleds) <- toList $ methods mod]
+-- Creates a map for each method (the above map)
+getBindingMethods :: Module -> Map DefinedMethod (Map CalledMethod [(String, [ArgName])])
+getBindingMethods mod = mapWithKey (\k _ -> getBindingCall mod ("RDY_" ++ k) k (methodBody $ methods mod ! k)) (methods mod)
 
-getBothCaller :: Module -> CalledMethod -> [(ThisName, String, [ArgName])]
-getBothCaller mod c = getRulesCaller mod c ++ getMethodsCaller mod c
+-- Creates union of the above two maps
+getBindingBoth :: Module -> Map ThisName (Map CalledMethod [(String, [ArgName])])
+getBindingBoth mod = union (getBindingRules mod) (getBindingMethods mod)
+
+-- Reverses the map from rule/method -> calledmethods  to   calledmethod -> rule/method
+getBothCaller :: Module -> Map CalledMethod [(ThisName, String, [ArgName])]
+getBothCaller mod =
+  fromList
+   [(rcm, [(r, rcond, rargs) | (rcond, rargs) <- rrest])
+    | (r, rcmall) <- toList $ getBindingBoth mod,
+      (rcm, rrest) <- toList rcmall]
+
+getCalled :: Module -> ThisName -> [CalledMethod]
+getCalled mod name =
+  let fullMap = getBindingBoth mod in
+    if member name fullMap
+      then keys (fullMap ! name)
+      else []
 
 getCalledMethods :: ModuleIfcs -> Module -> Map CalledMethod (Bool, [ArgName])
 getCalledMethods modIfcs Module{instances = ins, fps = fs} = fromList $ instMeths ++ fops

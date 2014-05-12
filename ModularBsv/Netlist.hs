@@ -16,7 +16,7 @@ allInfo :: ModuleIfcs -> Module -> (ModuleName,
                                     Map InstName Inst,
                                     Map FpName (Bool, [(ArgName, Integer)]),
                                     Map DefinedMethod (Bool, [(ArgName, Integer)]),
-                                    (CalledMethod -> [(ThisName, String, [ArgName])]),
+                                    Map CalledMethod [(ThisName, String, [ArgName])],
                                     Map CalledMethod (Bool, [ArgName]),
                                     Map PriorityElem [PriorityElem])
 allInfo modIfcs mod = (modName, binds, insts, fops, meths, bothCallers, calledMeth, sch)
@@ -66,12 +66,14 @@ main = do
     Left _ -> putStrLn "Error"
     Right mods -> do
       let modIfcs = Prelude.foldl (\acc m -> buildModuleIfc acc m) empty mods
+      --putStrLn $ show mods
+      putStrLn $ show [getBothCaller mod | mod <- mods]
       let allInfos = [allInfo modIfcs x| x <- mods]
       let fcalledms = [(name, bs, f, calledms)| (name, bs, _, _, _, f, calledms, _) <- allInfos]
-      let (bsproc, fproc, cmsproc) = head [(bs, f, calledms) | (name, bs, f, calledms) <- fcalledms, name == "mkProc"]
-      putStrLn $ show $ (keys cmsproc)
-      putStrLn $ show $ length $ concat [y | (x, Binding _ _ (Expr _ y)) <- toList bsproc]
-      putStrLn $ show $ length (keys bsproc)
+      --let (bsproc, fproc, cmsproc) = head [(bs, f, calledms) | (name, bs, f, calledms) <- fcalledms, name == "mkProc"]
+      --putStrLn $ show $ (keys cmsproc)
+      --putStrLn $ show $ length $ concat [y | (x, Binding _ _ (Expr _ y)) <- toList bsproc]
+      --putStrLn $ show $ length (keys bsproc)
       --putStrLn $ show [(cm, fproc cm)| cm <- keys cmsproc]
       --putStrLn $ show $ ([(moduleName mod, getBothCaller mod ("thomas", "murali")) | mod <- mods])
       --putStrLn $ show (calledm1504, calledm1505, calledm1506)
