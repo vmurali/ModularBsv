@@ -1,9 +1,9 @@
 module CalledMethods where
 
 import DataTypes
-import Data.Map as Map
+import qualified Data.Map as Map
 import Debug.Trace
-import qualified Data.List as List
+import qualified Data.Set as Set
 
 {-
 getInstCaller :: Module -> CalledMethod -> [(InstName, DefinedMethod)]
@@ -18,71 +18,81 @@ getInstCaller mod c =
 getBindingCaller ::
   Module -- Module to search in
   -> BindName -- The top-level binding name we are starting from for the search
-  -> [(CalledMethod, [ArgName])] -- The list of called methods + args in this call
+  -> Map.Map CalledMethod (Set.Set [ArgName])
 getBindingCaller mod b =
-  if member b (bindings mod)
+  if Map.member b (bindings mod)
     then
       case op of
-        MethCall c -> (c, args): foldAll
+        MethCall c -> Map.insertWith Set.union c (Set.singleton args) foldAll
         otherwise -> foldAll
-    else []
+    else Map.empty
   where
-    Expr op args = bindExpr $ bindings mod ! b
-    foldAll = concat [getBindingCaller mod x| x <- args]
+    Expr op args = bindExpr $ bindings mod Map.! b
+    foldAll = Prelude.foldl (\acc x -> Map.unionWith Set.union (getBindingCaller mod x) acc) Map.empty args
 
 -- Creates a map from above function
-getBindingMap :: Module -> Map BindName [(CalledMethod, [ArgName])]
-getBindingMap mod = mapWithKey (\k _ -> getBindingCaller mod k) (bindings mod)
+getBindingMap :: Module -> Map.Map BindName (Map.Map CalledMethod (Set.Set [ArgName]))
+getBindingMap mod = Map.mapWithKey (\k _ -> getBindingCaller mod k) (bindings mod)
 
+
+-- TODO : Must check again
 -- Collects the called-method-map (with predicate and arguments) for a rule/method with guard, and body
 getBindingCall ::
   Module -- Module to search in
   -> String -- The guard for the rule or method which calls the called method
   -> ThisName -- The rule or method which calls the called method
   -> [Calleds] -- The list of [if pred bindName] which is body of the calling method or rule
-  -> Map CalledMethod [(String, [ArgName])]
+  -> Map.Map CalledMethod (Set.Set (String, [ArgName]))
 getBindingCall mod guard rlName calleds =
-  fromListWith (++) $ List.nub $
-    [(guardMeth, [("1'b1", guardArgs)]) | member guard $ getBindingMap mod, (guardMeth, guardArgs) <- getBindingMap mod ! guard] ++
-    [(bodyMeth, [("1'b1", bodyArgs)]) | member rlName $ getBindingMap mod, (bodyMeth, bodyArgs) <- getBindingMap mod ! rlName] ++
-    concat [(meth, [(cond, args)]):[(m1, [(cond, a1)]) | (m1, a1) <- concat $ [getBindingMap mod ! arg | arg <- args, member arg $ getBindingMap mod]] | Calleds cond meth args <- calleds]
+  calledStuff
+  where
+    un = Map.unionWith Set.union
+    easyStuff cond name = if Map.member name (getBindingMap mod)
+                            then Map.map (\set -> Set.map (\x -> (cond, x)) set) (getBindingMap mod Map.! name)
+                            else Map.empty
+    calledStuff = foldl (\acc1 (Calleds cond meth args) ->
+                          Map.singleton meth (Set.singleton (cond, args)) `un`
+                            easyStuff "1'b1" cond `un`
+                              foldl (\acc2 x -> easyStuff cond x `un` acc2) acc1 args)
+                        (easyStuff "1'b1" guard `un` easyStuff "1'b1" rlName)
+                        calleds
 
 -- Creates a map for each rule (the above map)
-getBindingRules :: Module -> Map RuleName (Map CalledMethod [(String, [ArgName])])
-getBindingRules mod = mapWithKey (\k _ -> getBindingCall mod (ruleGuard $ rules mod ! k) k (ruleBody $ rules mod ! k)) (rules mod)
+getBindingRules :: Module -> Map.Map RuleName (Map.Map CalledMethod (Set.Set(String, [ArgName])))
+getBindingRules mod = Map.mapWithKey (\k _ -> getBindingCall mod (ruleGuard $ rules mod Map.! k) k (ruleBody $ rules mod Map.! k)) (rules mod)
 
 -- Creates a map for each method (the above map)
-getBindingMethods :: Module -> Map DefinedMethod (Map CalledMethod [(String, [ArgName])])
-getBindingMethods mod = mapWithKey (\k _ -> getBindingCall mod ("RDY_" ++ k) k (methodBody $ methods mod ! k)) (methods mod)
+getBindingMethods :: Module -> Map.Map DefinedMethod (Map.Map CalledMethod (Set.Set (String, [ArgName])))
+getBindingMethods mod = Map.mapWithKey (\k _ -> getBindingCall mod ("RDY_" ++ k) k (methodBody $ methods mod Map.! k)) (methods mod)
 
 -- Creates union of the above two maps
-getBindingBoth :: Module -> Map ThisName (Map CalledMethod [(String, [ArgName])])
-getBindingBoth mod = union (getBindingRules mod) (getBindingMethods mod)
+getBindingBoth :: Module -> Map.Map ThisName (Map.Map CalledMethod (Set.Set (String, [ArgName])))
+getBindingBoth mod = Map.union (getBindingRules mod) (getBindingMethods mod)
 
 -- Reverses the map from rule/method -> calledmethods  to   calledmethod -> rule/method
-getBothCaller :: Module -> Map CalledMethod [(ThisName, String, [ArgName])]
+getBothCaller :: Module -> Map.Map CalledMethod [(ThisName, String, [ArgName])]
 getBothCaller mod =
-  fromList
-   [(rcm, [(r, rcond, rargs) | (rcond, rargs) <- rrest])
-    | (r, rcmall) <- toList $ getBindingBoth mod,
-      (rcm, rrest) <- toList rcmall]
+  Map.fromList
+   [(rcm, [(r, rcond, rargs) | (rcond, rargs) <- Set.toList rrest])
+    | (r, rcmall) <- Map.toList $ getBindingBoth mod,
+      (rcm, rrest) <- Map.toList rcmall]
 
 getCalled :: Module -> ThisName -> [CalledMethod]
 getCalled mod name =
   let fullMap = getBindingBoth mod in
-    if member name fullMap
-      then keys (fullMap ! name)
+    if Map.member name fullMap
+      then Map.keys (fullMap Map.! name)
       else []
 
-getCalledMethods :: ModuleIfcs -> Module -> Map CalledMethod (Bool, [ArgName])
-getCalledMethods modIfcs Module{instances = ins, fps = fs} = fromList $ instMeths ++ fops
+getCalledMethods :: ModuleIfcs -> Module -> Map.Map CalledMethod (Bool, [ArgName])
+getCalledMethods modIfcs Module{instances = ins, fps = fs} = Map.fromList $ instMeths ++ fops
   where
     instMeths = [((x, name), (isV0, args)) |
-      (x, y) <- toList ins,
-        (name, (isV0, args, _)) <- toList $ methodsInModule (modIfcs ! instModule y)]
+      (x, y) <- Map.toList ins,
+        (name, (isV0, args, _)) <- Map.toList $ methodsInModule (modIfcs Map.! instModule y)]
     fops = [(("fp1", name), (case typ of Value _ -> xs == []
                                          otherwise -> False, [x | (x, y) <- xs])) |
-                       (name, Fp typ xs) <- toList fs] ++
+                       (name, Fp typ xs) <- Map.toList fs] ++
            [(("fp2", name), (case typ of Value _ -> xs == []
                                          otherwise -> False, [x | (x, y) <- xs])) |
-                       (name, Fp typ xs) <- toList fs]
+                       (name, Fp typ xs) <- Map.toList fs]
