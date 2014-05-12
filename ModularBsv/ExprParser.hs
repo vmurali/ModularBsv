@@ -37,8 +37,8 @@ methCallParser = do
 -- Order is important
 exprParser =
   choice [try (do{val <- x; semi; return val}) |
-          x <- [methCallParser, concatParser, wordParser,
-                binaryParser, unaryParser]]
+          x <- [methCallParser, concatParser, 
+                binaryParser, unaryParser, wordParser]]
 --                noneParser, unaryParser, binaryParser,
 --                wordParser, concatParser, methCallParser]]
 
