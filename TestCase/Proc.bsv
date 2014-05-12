@@ -145,7 +145,7 @@ module mkProc(Proc);
   let sb <- mkSb;
 
   // Architectural State
-  (* doc = "rf.rd2 rf.rd1" *)
+  (* doc = "[rf.rd2 rf.rd1]" *)
   Reg#(Addr) pc <- mkRegU;
   RFile      rf <- mkRFile;
   Memory    mem <- mkMemory;
