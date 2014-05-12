@@ -1,12 +1,13 @@
 import DataTypes
 import Data.Map as Map
+import Data.Maybe as Maybe
 import Data.List as List
 import Control.Applicative
 
 prettyPrint (mName,
 		mapBinds,
 		mapInsts,
-		mapRules,
+		listRules,
 		schedulerInf) =
 	"module" ++ mName ++ ";\n" ++	
 	concat (List.map 
@@ -14,8 +15,8 @@ prettyPrint (mName,
 		$ Map.assocs mapBinds)
 	++
 	concat (List.map 
-		(undefined)
-		$ Map.assocs mapRules)
+		(\n-> "wire "++ "RDY_"++n++";\n")
+		$ listRules)
 	++
 	concat (List.map 
 		(\(n,inst) -> prettyPrintInst (n,inst))   
@@ -37,7 +38,7 @@ prettyPrintInst (name,inst) =
 	(show $ instModule inst) ++
 	case (instWidth inst,instInit inst, instSize inst) of
 		(Expr None _ ,Expr None _ ,Expr None _ ) -> "\n" 
-		otherwise -> "#(" ++ (intercalate "," $ [showExp . instWidth, showExp . instInit , showExp . instSize] <*> [inst] ) ++")\n" 
+		otherwise -> "#(" ++ (intercalate "," . Maybe.catMaybes $ [showExp . instWidth, showExp . instInit , showExp . instSize] <*> [inst] ) ++")\n" 
 	++ "("
 	++ intercalate
 		","
@@ -46,7 +47,8 @@ prettyPrintInst (name,inst) =
 			$ instArgs inst)
 	++ ")\n"
 	where
-		showExp (Expr _ l) = case l of
+		showExp (Expr None l) = Nothing
+		showExp (Expr _ l) = Just $ case l of
 			[] -> undefined
 			[a] -> show a 	 
 			otherwise -> "{"++intercalate "," l  ++ "}" 	
