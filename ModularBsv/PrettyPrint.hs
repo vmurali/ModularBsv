@@ -4,27 +4,66 @@ import Data.List as List
 
 prettyPrint (mName,
 		mapBinds,
-		_,
+		mapInsts,
 		_,
 		_,
 		_,
 		_,
 		schedulerInf) =
-	List.foldl 
-		(\acc (n,bind) -> acc ++ prettyPrintBind (n,bind))   
-		[]
+	concat . map 
+		(\(n,bind) -> prettyPrintBindW (n,bind))   
 		(Map.assocs mapBinds) 
 	++
-	List.foldl 
-		(\acc (n,l) -> acc ++ prettyPrintSched n l) 
-		[]
+	concat . map --HANDLE THE RULES 
+		(undefined)
+		undefined
+	++
+	concat . map 
+		(\(n,inst) -> prettyPrintInst (n,inst))   
+		(Map.assocs mapInsts ) 
+	++
+	concat . map 
+		(\(n,bind) -> prettyPrintBindA (n,bind))   
+		(Map.assocs mapBinds) 
+	++
+	concat . map 
+		(\(n,l) -> prettyPrintSched n l) 
 		(Map.assocs schedulerInf) 
 
 
 
-prettyPrintBind (bn, Binding ba bz bexpr) = --TODO : MAYBE INTEGER  
-  "wire " ++ bn ++ "[" ++ show ba ++ "-1:0][" ++ show bz ++ "-1:0]\nassign " ++ bn ++ " = " ++
-  prettyPrintExp bexpr ++ "\n"
+
+prettyPrintInst (name,inst) =
+	show name ++
+	" " ++
+	(show $ instModule inst) ++
+	case (instWidth inst,instInit inst, instSize inst) of
+		(Expr None _ ,Expr None _ ,Expr None _ ) -> "\n" 
+		otherwise -> "#(" ++ undefined ++")\n" 
+	++ "("
+	++ intercalate
+		","
+		map 
+			(\(x,y)-> x++"_"++y)
+			instArgs
+	++ ")"
+
+
+
+
+prettyPrintBindW (bn, Binding ba bz bexpr) = --TODO : MAYBE INTEGER  
+  "wire " ++ bn ++ case ba of 
+			Nothing -> ""
+			Just 0 -> "" 
+			otherwise -> "[" ++ show ba ++ "-1:0]"
+  ++ case bz of
+	0 -> ""
+	otherwise -> "[" ++ show bz ++ "-1:0]\n"
+
+
+prettyPrintBindA (bn, Binding ba bz bexpr) = --TODO : MAYBE INTEGER  
+	"assign " ++ bn ++ " = " ++
+	prettyPrintExp bexpr ++ "\n"
 
 
 prettyPrintExp (Expr op listArgs) = case op of 
@@ -42,6 +81,6 @@ prettyPrintSched (x,y) l =
 	++ "\n"
 	where
 		printTerm (a,b) = if a == "fp" || a == "this" 
-				then "EN_"++b else "EN_" ++ a ++ "_" ++ b 
+				then "EN_" ++ b else "EN_" ++ a ++ "_" ++ b 
 
 
