@@ -67,10 +67,12 @@ main = do
     Right mods -> do
       let modIfcs = Prelude.foldl (\acc m -> buildModuleIfc acc m) empty mods
       let allInfos = [allInfo modIfcs x| x <- mods]
-      let fcalledms = [(name, f, calledms)| (name, _, _, _, _, f, calledms, _) <- allInfos]
-      let (fproc, cmsproc) = head [(f, calledms) | (name, f, calledms) <- fcalledms, name == "mkProc"]
-      putStrLn $ show $ length (keys cmsproc)
-      putStrLn $ show [(cm, fproc cm)| cm <- keys cmsproc]
+      let fcalledms = [(name, bs, f, calledms)| (name, bs, _, _, _, f, calledms, _) <- allInfos]
+      let (bsproc, fproc, cmsproc) = head [(bs, f, calledms) | (name, bs, f, calledms) <- fcalledms, name == "mkProc"]
+      putStrLn $ show $ (keys cmsproc)
+      putStrLn $ show $ length $ concat [y | (x, Binding _ _ (Expr _ y)) <- toList bsproc]
+      putStrLn $ show $ length (keys bsproc)
+      --putStrLn $ show [(cm, fproc cm)| cm <- keys cmsproc]
       --putStrLn $ show $ ([(moduleName mod, getBothCaller mod ("thomas", "murali")) | mod <- mods])
       --putStrLn $ show (calledm1504, calledm1505, calledm1506)
       --putStrLn $ show (length calledms)

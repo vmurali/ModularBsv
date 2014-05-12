@@ -34,7 +34,7 @@ instMethParser = do
 justParser = do
   reserved "Just"
   i <- parens $ do
-         identifier
+         identifier --- Must be reserved "Bit". Stupid encoding error omits the "t" sometimes
          integer
   return $ Just i
 
