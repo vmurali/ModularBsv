@@ -34,7 +34,7 @@ instMethParser = do
 justParser = do
   reserved "Just"
   i <- parens $ do
-         reserved "Bit"
+         identifier
          integer
   return $ Just i
 

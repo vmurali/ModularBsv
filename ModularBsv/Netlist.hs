@@ -70,6 +70,7 @@ main = do
       let (calledm1504, _) = calledms !! 1504
       let (calledm1505, _) = calledms !! 1505
       let (calledm1506, _) = calledms !! 1506
+      putStrLn $ show mods
       --putStrLn $ show $ ([(moduleName mod, getBothCaller mod ("thomas", "murali")) | mod <- mods])
       --putStrLn $ show (calledm1504, calledm1505, calledm1506)
       --putStrLn $ show (length calledms)
