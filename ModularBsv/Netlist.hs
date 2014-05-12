@@ -58,10 +58,10 @@ buildModuleIfc modIfcs mod = let gMod = getModuleIfc modIfcs mod in
   insert (moduleName mod) gMod modIfcs
 
 main = do
-  --filename <- getLine
-  --parsed <- parseFromFile modulesParser filename
-  input <- getContents
-  let parsed = parse modulesParser "" input
+  filename <- getLine
+  parsed <- parseFromFile modulesParser filename
+  --input <- getContents
+  --let parsed = parse modulesParser "" input
   case (parsed) of
     Left _ -> putStrLn "Error"
     Right mods -> do
