@@ -3,6 +3,7 @@ module CalledMethods where
 import DataTypes
 import Data.Map as Map
 import Debug.Trace
+import qualified Data.List as List
 
 {-
 getInstCaller :: Module -> CalledMethod -> [(InstName, DefinedMethod)]
@@ -41,7 +42,7 @@ getBindingCall ::
   -> [Calleds] -- The list of [if pred bindName] which is body of the calling method or rule
   -> Map CalledMethod [(String, [ArgName])]
 getBindingCall mod guard rlName calleds =
-  fromListWith (++) $
+  fromListWith (++) $ List.nub $
     [(guardMeth, [("1'b1", guardArgs)]) | member guard $ getBindingMap mod, (guardMeth, guardArgs) <- getBindingMap mod ! guard] ++
     [(bodyMeth, [("1'b1", bodyArgs)]) | member rlName $ getBindingMap mod, (bodyMeth, bodyArgs) <- getBindingMap mod ! rlName] ++
     concat [(meth, [(cond, args)]):[(m1, [(cond, a1)]) | (m1, a1) <- concat $ [getBindingMap mod ! arg | arg <- args, member arg $ getBindingMap mod]] | Calleds cond meth args <- calleds]
