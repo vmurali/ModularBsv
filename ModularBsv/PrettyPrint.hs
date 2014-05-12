@@ -8,6 +8,8 @@ prettyPrint (mName,
 		mapBinds,
 		mapInsts,
 		listRules,
+		mapMeths,
+		mapFps,
 		schedulerInf) =
 	"module" ++ mName ++ ";\n" ++	
 	concat (List.map 
@@ -20,6 +22,14 @@ prettyPrint (mName,
 		$ listRules)
 	++
 	concat (List.map 
+		(\(n,meth) -> prettyPrintDefinedMethod (n, extractSize $ methodType meth ,methodArgs meth))   
+		$ Map.assocs mapMeths)
+	++
+	concat (List.map 
+		(\(n,fp) -> prettyPrintDefinedMethod (n, extractSize $ fpType fp ,fpArgs fp))   
+		$ Map.assocs mapFps)
+	++
+	concat (List.map 
 		(\(n,inst) -> prettyPrintInst (n,inst))   
 		$ Map.assocs mapInsts )
 	++
@@ -30,11 +40,18 @@ prettyPrint (mName,
 	concat (List.map 
 		(\(n,l) -> prettyPrintSched n l) 
 		$ Map.assocs schedulerInf)
-	++ "endmodule\n" 
+	++ "endmodule\n"
+
+	where
+		extractSize t = case t of
+					Value i -> i
+					Action -> -1  -- Microhack to simulate the absence of size
+					ActionValue i -> i  
+
 
 prettyPrintFp (n,size,args) =
-	"output " ++ "[" ++ show size ++ "-1:0] " ++ "fp1_"++ n ++ " ;\n" ++ --I can just always add theses wires no? Even if it's not a value fp
-	"output " ++ "[" ++ show size ++ "-1:0] " ++ "fp2_"++ n ++ " ;\n" ++ --I can just always add theses wires no? Even if it's not a value fp
+	(if size /= -1 then "output " ++ (if size /= 0 then "[" ++ show size ++ "-1:0] " else "") ++ "fp1_"++ n ++ " ;\n" else "") ++ 
+	(if size /= -1 then "output " ++ (if size /= 0 then "[" ++ show size ++ "-1:0] " else "") ++ "fp2_"++ n ++ " ;\n" else "")  ++
 	"output " ++ "RDY_fp1_" ++ n ++ " ;\n" ++ 
 	"output " ++ "RDY_fp2_" ++ n ++ " ;\n" ++ 
 	"input " ++ "EN_fp1_" ++ n ++ " ;\n" ++
@@ -45,8 +62,8 @@ prettyPrintFp (n,size,args) =
 			args)	
 
 prettyPrintDefinedMethod (n,size,args)=
-	"input " ++ "[" ++ show size ++ "-1:0] " ++ "fp1_"++ n ++ " ;\n" ++ --Same thing
-	"input " ++ "[" ++ show size ++ "-1:0] " ++ "fp2_"++ n ++ " ;\n" ++ --Same thing
+	(if size /= -1 then "input " ++ (if size /= 0 then "[" ++ show size ++ "-1:0] " else "") ++ "fp1_"++ n ++ " ;\n" else "") ++ 
+	(if size /= -1 then "input " ++ (if size /= 0 then "[" ++ show size ++ "-1:0] " else "") ++ "fp2_"++ n ++ " ;\n" else "") ++
 	"input " ++ "RDY_fp1_" ++ n ++ " ;\n" ++ 
 	"input " ++ "RDY_fp2_" ++ n ++ " ;\n" ++ 
 	"output " ++ "EN_fp1_" ++ n ++ " ;\n" ++
