@@ -81,7 +81,7 @@ getCalled :: Module -> ThisName -> [CalledMethod]
 getCalled mod name =
   let fullMap = getBindingBoth mod in
     if Map.member name fullMap
-      then Map.keys (fullMap Map.! name)
+      then Map.keys (Map.filterWithKey (\(k, _) _ -> k /= "Prelude") (fullMap Map.! name))
       else []
 
 getCalledMethods :: ModuleIfcs -> Module -> Map.Map CalledMethod (Bool, [ArgName])
