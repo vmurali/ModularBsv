@@ -30,7 +30,31 @@ prettyPrint (mName,
 	concat (List.map 
 		(\(n,l) -> prettyPrintSched n l) 
 		$ Map.assocs schedulerInf)
-	++"endmodule" 
+	++ "endmodule\n" 
+
+prettyPrintFp (n,size,args) =
+	"output " ++ "[" ++ show size ++ "-1:0] " ++ "fp1_"++ n ++ " ;\n" ++ --I can just always add theses wires no? Even if it's not a value fp
+	"output " ++ "[" ++ show size ++ "-1:0] " ++ "fp2_"++ n ++ " ;\n" ++ --I can just always add theses wires no? Even if it's not a value fp
+	"output " ++ "RDY_fp1_" ++ n ++ " ;\n" ++ 
+	"output " ++ "RDY_fp2_" ++ n ++ " ;\n" ++ 
+	"input " ++ "EN_fp1_" ++ n ++ " ;\n" ++
+	"input " ++ "EN_fp2_" ++ n ++ " ;\n" ++
+	concat (List.map
+			(\(arg,s) -> "input " ++ show s ++ "-1:0] " ++ "fp_1" ++ arg ++ ";\n" ++
+					"input " ++ show s ++ "-1:0] " ++ "fp_2" ++ arg ++ ";\n" )
+			args)	
+
+prettyPrintDefinedMethod (n,size,args)=
+	"input " ++ "[" ++ show size ++ "-1:0] " ++ "fp1_"++ n ++ " ;\n" ++ --Same thing
+	"input " ++ "[" ++ show size ++ "-1:0] " ++ "fp2_"++ n ++ " ;\n" ++ --Same thing
+	"input " ++ "RDY_fp1_" ++ n ++ " ;\n" ++ 
+	"input " ++ "RDY_fp2_" ++ n ++ " ;\n" ++ 
+	"output " ++ "EN_fp1_" ++ n ++ " ;\n" ++
+	"output " ++ "EN_fp2_" ++ n ++ " ;\n" ++
+	concat (List.map
+			(\(arg,s) -> "output " ++ show s ++ "-1:0] " ++ "fp_1" ++ arg ++ ";\n" ++
+					"output " ++ show s ++ "-1:0] " ++ "fp_2" ++ arg ++ ";\n" )
+			args)	
 
 
 
@@ -47,7 +71,7 @@ prettyPrintInst (name,inst) =
 		(List.map 
 			(\(x,y)-> x++"_"++y)
 			$ instArgs inst)
-	++ ")\n"
+	++ ");\n"
 	where
 		showExp (Expr None l) = Nothing
 		showExp (Expr _ l) = Just $ case l of
