@@ -1,8 +1,28 @@
+module PrettyPrint where
 import DataTypes
+import Netlist
+import System.IO
+import Text.Parsec
+import Text.Parsec.String
 import Data.Map as Map
 import Data.Maybe as Maybe
 import Data.List as List
 import Control.Applicative
+
+
+--main :: IO ()
+--main = do
+--	filenameinput <- getLine
+--	filenameoutput <- getLine
+--	parsed <- parseFromFile modulesParser filenameinput
+--	case parsed of
+--    		Left _ -> putStrLn "Parse error: You think I will provide you usefull information to help you to debug your code: Not at all"
+--    		Right mods -> do
+--      			let modIfcs = List.foldl (\acc m -> buildModuleIfc acc m) empty mods
+--      			let netlist = prettyPrint undefined
+--			writeFile filenameoutput netlist
+--			return ()
+--
 
 prettyPrint (mName,
 		mapBinds,
