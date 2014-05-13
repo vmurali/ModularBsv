@@ -63,7 +63,7 @@ main = do
   --input <- getContents
   --let parsed = parse modulesParser "" input
   case (parsed) of
-    Left _ -> putStrLn "Error"
+    Left error -> putStrLn $ show error
     Right mods -> do
       let modIfcs = Prelude.foldl (\acc m -> buildModuleIfc acc m) empty mods
       --putStrLn $ show mods

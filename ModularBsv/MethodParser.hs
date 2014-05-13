@@ -80,4 +80,4 @@ actionValueParser = do
 methodParser =
   try actionParser <|>
   try actionValueParser <|>
-  valueParser
+  try valueParser
