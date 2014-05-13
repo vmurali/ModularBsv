@@ -23,7 +23,13 @@ instance JoinSemiLattice (Conflict) where
   join x CF = x
 
 instance BoundedJoinSemiLattice (Conflict) where
-	bottom = CF
+  bottom = CF
+
+instance Ord a => JoinSemiLattice (Set.Set a) where
+  join x y = Set.union x y
+
+instance Ord a => BoundedJoinSemiLattice (Set.Set a) where
+  bottom = Set.empty
 
 instToModule mod m = instModule $ instances mod Map.! m
 instToArgs mod m = instArgs $ instances mod Map.! m
@@ -49,20 +55,20 @@ toActualArgs moduleIfcs mod (m1, h1) =
 --cmCalledMethods moduleIfcs mod (m1, h1) (m2, h2)
 --  | m1 == "fp" || m1 == "fp1" || m1 == "fp2" , m2 == "fp" || m2 == "fp1" || m2 == "fp2" = fpConflict mod Map.! (h1, h2)
 --  | m1 == m2 = (cmForMethodsInModule $ moduleIfcs Map.! (instToModule mod m1)) Map.! (h1,h2)
---  | m1 == "fp" || m1 == "fp1" || m1 == "fp2" = joins1 [cmCalledMethods moduleIfcs mod (m1, h1) q | q <- actCalles2]
---  | m2 == "fp" || m2 == "fp1" || m2 == "fp2" = joins1 [cmCalledMethods moduleIfcs mod p (m2, h2) | p <- actCalles1]
---  | m1 == "this" = joins1 [cmCalledMethods moduleIfcs mod p (m2, h2) | p <- getCalled mod h1] --hack
---  | m2 == "this" = joins1 [cmCalledMethods moduleIfcs mod (m1, h1) q | q <- getCalled mod h2] --hack
---  | otherwise = joins1 [cmCalledMethods moduleIfcs mod p q | p <- actCalles1, q <- actCalles2]
+--  | m1 == "fp" || m1 == "fp1" || m1 == "fp2" = joins [cmCalledMethods moduleIfcs mod (m1, h1) q | q <- actCalles2]
+--  | m2 == "fp" || m2 == "fp1" || m2 == "fp2" = joins [cmCalledMethods moduleIfcs mod p (m2, h2) | p <- actCalles1]
+--  | m1 == "this" = joins [cmCalledMethods moduleIfcs mod p (m2, h2) | p <- getCalled mod h1] --hack
+--  | m2 == "this" = joins [cmCalledMethods moduleIfcs mod (m1, h1) q | q <- getCalled mod h2] --hack
+--  | otherwise = joins [cmCalledMethods moduleIfcs mod p q | p <- actCalles1, q <- actCalles2]
 --  where
 --    actCalles1 = toActualArgs moduleIfcs mod (m1, h1)
 --    actCalles2 = toActualArgs moduleIfcs mod (m2, h2)
 
 cmCalledMethods :: ModuleIfcs -> Module -> CalledMethod -> CalledMethod -> Conflict
-cmCalledMethods modIfcs mod x y = joins . map (basicConflict modIfcs mod) . Set.elems $ dependenciesAll (x,y)
+cmCalledMethods modIfcs mod x y = joins . map (basicConflict modIfcs mod) . Set.elems $ dependenciesAll modIfcs mod (x,y)
  
 basicConflict modIfcs mod ((m1, h1),(m2, h2)) | fpM m1, fpM m2 = (fpConflict mod) Map.! (h1,h2)  
-			 		      | m1 == m2 = (cmForMethodsInModule modIfcs ) Map.! (h1,h2)
+			 		      | m1 == m2 = (cmForMethodsInModule $ modIfcs Map.! instToModule mod m1 ) Map.! (h1,h2)
 					      | otherwise  = CF 
 
 fpM m = m == "fp1" || m == "fp2" || m == "fp"
