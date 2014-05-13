@@ -1,7 +1,9 @@
 module PrettyPrint where
 import DataTypes
 import Netlist
+import Conflict
 import ModuleParser
+import Scheduler
 import System.IO
 import Text.Parsec
 import Text.Parsec.String
@@ -9,6 +11,7 @@ import Data.Map as Map
 import Data.Maybe as Maybe
 import Data.List as List
 import Control.Applicative
+
 
 
 main :: IO ()
@@ -27,7 +30,7 @@ main = do
 					    mapMeths = methods m
 					    listFps = fps m
 					    listRules = Map.keys $ rules m
-					    schedulerInf = undefined
+					    schedulerInf = scheduler modIfcs m 
 					    netlist = prettyPrint (mName,mapBinds,mapInsts,listRules,mapMeths,listFps,schedulerInf) 
 					    in  ( modIfcs ,str ++ netlist))
 						   (Map.empty,"")
