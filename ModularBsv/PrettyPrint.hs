@@ -20,7 +20,7 @@ main = do
 	filenameoutput <- getLine
 	parsed <- parseFromFile modulesParser filenameinput
 	case parsed of
-    		Left _ -> putStrLn "Parse error: You think I will provide you usefull information to help you to debug your code: Not at all"
+    		Left _ -> putStrLn "Parse error: You think I will provide you useful information to help you debug your code: Not at all"
     		Right mods -> appendFile filenameoutput 
 				. snd $ (List.foldl (\(acc,str) m -> 
       					let modIfcs = buildModuleIfc acc m
@@ -45,7 +45,7 @@ prettyPrint (mName,
 		mapMeths,
 		listFps,
 		schedulerInf) =
-	"module" ++ mName ++ ";\n" ++	
+	"module " ++ mName ++ ";\n" ++	
 	concat (List.map 
 		(\(n,bind) -> prettyPrintBindW (n,bind))   
 		$ Map.assocs mapBinds)
@@ -91,8 +91,8 @@ prettyPrintFp (n,size,args) =
 	"input " ++ "EN_fp1_" ++ n ++ " ;\n" ++
 	"input " ++ "EN_fp2_" ++ n ++ " ;\n" ++
 	concat (List.map
-			(\(arg,s) -> "input " ++ show s ++ "-1:0] " ++ "fp_1" ++ arg ++ ";\n" ++
-					"input " ++ show s ++ "-1:0] " ++ "fp_2" ++ arg ++ ";\n" )
+			(\(arg,s) -> "input [" ++ show s ++ "-1:0] " ++ "fp1_" ++ arg ++ ";\n" ++
+					"input [" ++ show s ++ "-1:0] " ++ "fp2_" ++ arg ++ ";\n" )
 			args)	
 
 prettyPrintDefinedMethod (n,size,args)=
@@ -103,8 +103,8 @@ prettyPrintDefinedMethod (n,size,args)=
 	"output " ++ "EN_fp1_" ++ n ++ " ;\n" ++
 	"output " ++ "EN_fp2_" ++ n ++ " ;\n" ++
 	concat (List.map
-			(\(arg,s) -> "output " ++ show s ++ "-1:0] " ++ "fp_1" ++ arg ++ ";\n" ++
-					"output " ++ show s ++ "-1:0] " ++ "fp_2" ++ arg ++ ";\n" )
+			(\(arg,s) -> "output [" ++ show s ++ "-1:0] " ++ "fp_1" ++ arg ++ ";\n" ++
+					"output [" ++ show s ++ "-1:0] " ++ "fp_2" ++ arg ++ ";\n" )
 			args)	
 
 
@@ -133,14 +133,14 @@ prettyPrintInst (name,inst) =
 
 
 prettyPrintBindW (bn, Binding ba bz bexpr) = 
-  "wire " ++ bn ++ case ba of 
+  "wire " ++ case ba of 
 			Nothing -> ""
 			Just 0 -> "" 
-			otherwise -> "[" ++ show ba ++ "-1:0]"
+			otherwise -> "[" ++ show ba ++ "-1:0] "
   ++ case bz of
 	0 -> ""
-	otherwise -> "[" ++ show bz ++ "-1:0]"
-  ++ ";\n"
+	otherwise -> "[" ++ show bz ++ "-1:0] "
+  ++ bn ++ " ;\n"
 
 
 prettyPrintBindA (bn, Binding ba bz bexpr) = 

@@ -8,6 +8,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.String.Utils as S
 import qualified Data.Either as E
 import qualified Data.Set.Monad as Set
+import Debug.Trace
 
 import Algebra.Lattice  --SOOOO COOOL
 
@@ -21,6 +22,8 @@ instance JoinSemiLattice (Conflict) where
   join _ C = C
   join CF x = x
   join x CF = x
+  join SA SA = SA
+  join SB SB = SB
 
 instance BoundedJoinSemiLattice (Conflict) where
   bottom = CF
@@ -89,16 +92,17 @@ dependenciesExpand modIfcs mod x = Set.union (buildDependenciesFunction modIfcs 
 dependenciesAll :: ModuleIfcs -> Module -> (CalledMethod, CalledMethod) -> Set.Set (CalledMethod, CalledMethod)
 dependenciesAll modIfcs mod x = lfpFrom (Set.singleton x) (dependenciesExpand modIfcs mod)
 
-
+thisM m = m == "this"
 
 fullCm ::
   ModuleIfcs
   -> Module
-  -> ThisName
-  -> ThisName
+  -> PriorityElem
+  -> PriorityElem
   -> Conflict
-fullCm moduleIfcs mod x1 x2 =
-  if x1 == x2 && Map.member x1 (methods mod)
+fullCm moduleIfcs mod (m1, x1) (m2, x2) = 
+  if primitive mod then fpConflict mod Map.! (x1,x2) else 
+  if thisM m1 && thisM m2 && x1 == x2 && Map.member x1 (methods mod)
     then if margs == [] && isValue
            then CF
            else C
@@ -109,8 +113,14 @@ fullCm moduleIfcs mod x1 x2 =
     isValue = case mtype of
                 Value _ -> True
                 otherwise -> False
-    hs1 = getCalled mod x1
-    hs2 = getCalled mod x2
+    hs1 = if thisM m1 && (Map.member x1 (rules mod) || Map.member x1 (methods mod))
+            then {-if primitive mod then fefgefef else-} getCalled mod x1
+            else [(m1, x1)]
+    hs2 = if thisM m2 && (Map.member x2 (rules mod) || Map.member x2 (methods mod))
+            then {-if primitive mod then efe e fe else-} getCalled mod x2
+            else [(m2, x2)]
+
+primitive mod = moduleName mod == "mkRegFile" || moduleName mod == "mkEHR" 
 
 fpu ::
   ModuleIfcs

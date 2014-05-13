@@ -63,9 +63,9 @@ moduleParser = do
   symbol "-- AP instance comments"
   --priorityList' <- option [] priorityParser
   instArgs'' <- many instArgsParser
-  let (priorityList'', instArgs') = List.partition (\(id, _) -> id == "fp1") instArgs''
+  let (priorityList', instArgs') = List.partition (\(id, _) -> id == "fp1") instArgs''
   let instArgs = fromList [(x, if y == [] then [] else head y)|(x, y) <- instArgs']
-  let priorityList' = if priorityList'' == [] then [] else let (_, vs) = head priorityList'' in vs
+  let priorityList = if priorityList' == [] then [] else let (_, vs) = head priorityList' in vs
   let insts'' = if (insts' /= [] && let (nm, _, _, _, _, _, _) = head insts' in nm == "fp1")
                   then tail $ tail insts'
                   else insts'
@@ -78,9 +78,6 @@ moduleParser = do
   symbol "-- AP remaining proof obligations"
   symbol "[]"
   symbol "-----"
-  let flatList = Set.fromList $ concat priorityList'
-  let rulesMeths = keys rules ++ keys methods
-  let priorityList = priorityList' ++ [if Set.member ("this", x) flatList then [] else [("this", x)]| x <- rulesMeths ]
   return $ Module modName insts bindings rules methods fps conflict priorityList
 
 modulesParser = do

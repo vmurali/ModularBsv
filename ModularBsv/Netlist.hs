@@ -1,4 +1,4 @@
-module Netlist where
+--module Netlist where
 
 import DataTypes
 import CalledMethods
@@ -44,7 +44,7 @@ getModuleIfc modIfcs mod =
   ModuleIfc
     [x | Fp x _ _ <- fps mod]
     (fromList [(k, (isV0 k, args k, fpu modIfcs mod k)) | k <- meths])
-    (fromList [((k1, k2), fullCm modIfcs mod k1 k2) | k1 <- meths, k2 <- meths ])
+    (fromList [((k1, k2), fullCm modIfcs mod ("this",k1) ("this",k2)) | k1 <- meths, k2 <- meths ])
   where
     getMeths k = methods mod ! k
     meths = keys $ methods mod
@@ -58,8 +58,8 @@ buildModuleIfc modIfcs mod = let gMod = getModuleIfc modIfcs mod in
   insert (moduleName mod) gMod modIfcs
 
 main = do
-  filename <- getLine
-  parsed <- parseFromFile modulesParser filename
+  --filename <- getLine
+  parsed <- parseFromFile modulesParser "../TestCase/output"
   --input <- getContents
   --let parsed = parse modulesParser "" input
   case (parsed) of
@@ -69,7 +69,7 @@ main = do
       --putStrLn $ show mods
       --putStrLn $ show [(moduleName mod, priorityList mod) | mod <- mods]
       let allInfos = [allInfo modIfcs x| x <- mods]
-      let fcalledms = [(name, f, calledms)| (name, bs, _, _, _, f, calledms, _) <- allInfos]
+      let fcalledms = [(name,s)| (name, bs, _, _, _, f, calledms, s) <- allInfos]
       putStrLn $ show fcalledms
       --let (bsproc, fproc, cmsproc) = head [(bs, f, calledms) | (name, bs, f, calledms) <- fcalledms, name == "mkProc"]
       --putStrLn $ show $ (keys cmsproc)
