@@ -1,4 +1,4 @@
---module Netlist where
+module Netlist where
 
 import DataTypes
 import CalledMethods
