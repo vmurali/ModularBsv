@@ -1,4 +1,4 @@
-module Netlist where
+--module Netlist where
 
 import DataTypes
 import CalledMethods
@@ -27,7 +27,7 @@ allInfo modIfcs mod = (modName, binds, insts, fops, meths, bothCallers, calledMe
     fops = fromList [ (fpName, (case typ of
                                   Value _ -> args == []
                                   otherwise -> False,
-                                args)) | (fpName, Fp typ args) <- toList $ fps mod]
+                                args)) | Fp fpName typ args <- fps mod]
     meths = fromList [ (name, (case typ of
                                  Value _ -> args == []
                                  otherwise -> False,
@@ -42,7 +42,7 @@ getModuleIfc ::
   -> ModuleIfc
 getModuleIfc modIfcs mod =
   ModuleIfc
-    (keys (fps mod))
+    [x | Fp x _ _ <- fps mod]
     (fromList [(k, (isV0 k, args k, fpu modIfcs mod k)) | k <- meths])
     (fromList [((k1, k2), fullCm modIfcs mod k1 k2) | k1 <- meths, k2 <- meths ])
   where

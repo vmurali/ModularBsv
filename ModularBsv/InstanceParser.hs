@@ -146,12 +146,12 @@ instanceParser = do
   symbol "[]"
   methTypes <- instMethTypeParser
   many (balanced '(' ')')
-  return $ (name, modName, getConflict sched, width, init, sz, fromList
-    [(name, if isEn
-              then case retSize of
-                     Just size -> Fp (ActionValue size) (zip args argSize)
-                     Nothing -> Fp Action (zip args argSize)
-              else case retSize of
-                     Just size -> Fp (Value size) (zip args argSize)
-                     Nothing -> Fp (Value 0) (zip args argSize))
+  return $ (name, modName, getConflict sched, width, init, sz,
+    [(if isEn
+        then case retSize of
+               Just size -> Fp name (ActionValue size) (zip args argSize)
+               Nothing -> Fp name Action (zip args argSize)
+        else case retSize of
+               Just size -> Fp name (Value size) (zip args argSize)
+               Nothing -> Fp name (Value 0) (zip args argSize))
       | ((name, args), (argSize, retSize, isEn)) <- zip meths methTypes])

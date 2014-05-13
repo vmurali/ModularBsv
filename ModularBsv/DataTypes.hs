@@ -57,7 +57,8 @@ data Method = Method
   } deriving(Show,Eq,Ord) --Done
 
 data Fp = Fp
-  { fpType :: TypeOfMethod
+  { fpName :: FpName
+  , fpType :: TypeOfMethod
   , fpArgs :: [ (ArgName,Integer) ]
 } deriving(Show,Eq,Ord)
 
@@ -81,7 +82,7 @@ data Module = Module
   , bindings :: Map.Map BindName Binding
   , rules :: Map.Map RuleName Rule
   , methods :: Map.Map DefinedMethod Method
-  , fps :: Map.Map FpName Fp
+  , fps :: [Fp]
   , fpConflict :: Map.Map (FpName, FpName) Conflict 
   , priorityList :: [ [ PriorityElem ] ]
   } deriving(Show,Eq,Ord)--Done

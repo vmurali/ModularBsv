@@ -74,7 +74,7 @@ moduleParser = do
   let (_, _, conflict, _, _, _, fps) = if (insts' /= [] &&
                                            let (nm, _, _, _, _, _, _) = head insts' in nm == "fp1")
         then head insts'
-        else (undefined, undefined, empty, undefined, undefined, undefined, empty)
+        else (undefined, undefined, empty, undefined, undefined, undefined, [])
   symbol "-- AP remaining proof obligations"
   symbol "[]"
   symbol "-----"
@@ -93,7 +93,7 @@ regFile = Module
   , bindings = empty
   , rules = empty
   , methods = fromList [("sub", Method (Value 0) [("x", 0)] []), ("upd", Method Action [("x", 0), ("y", 0)] [])]
-  , fps = empty
+  , fps = []
   , fpConflict = fromList [(("sub", "sub"), C), (("upd", "upd"), C), (("sub", "upd"), SB), (("upd", "sub"), SA)]
   , priorityList = []
   }
@@ -107,7 +107,7 @@ ehr = Module
   , rules = empty
   , methods = fromList ([("r" ++ show x, Method (Value 0) [] []) | x <- ehrList] ++
                         [("w" ++ show x, Method Action [("x", 0)] []) | x <- ehrList])
-  , fps = empty
+  , fps = []
   , fpConflict = fromList
       ([(("r" ++ show x, "r" ++ show y), if x < y then SB else if x == y then CF else SA)| x <- ehrList, y <- ehrList] ++
        [(("r" ++ show x, "w" ++ show y), if x <= y then SB else SA)| x <- ehrList, y <- ehrList] ++
