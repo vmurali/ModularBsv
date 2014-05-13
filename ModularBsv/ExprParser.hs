@@ -22,7 +22,7 @@ binaryParser = do
 
 wordParser = do
   op <- terminal
-  ids <- many1 $ try terminal
+  ids <- many1 $ terminal
   return $ Expr (Word op) ids
 
 -- MUST TODO THIS

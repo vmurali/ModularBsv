@@ -52,7 +52,7 @@ finalMCallParser = do
   m <- identifier
   dot
   h <- identifier
-  args <- many $ try terminal
+  args <- many $ terminal
   return ((m,h), args)
 
 

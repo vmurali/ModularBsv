@@ -73,11 +73,6 @@ schedStmtParser = do
   y <- singleOrListParser
   return (x, y, conf)
 
-ignoreTillCloseOpenReset = do
-  manyTill anyChar (try $ lookAhead (do{symbol ")"; symbol "["; 
-    try (do {reserved "reset"; symbol "{"; reserved "wire"}) <|>
-    (do {reserved "clock"; symbol "{"; reserved "osc"})}))
-
 parseSched = do
   reserved "SchedInfo"
   scheds <- brackets (sepBy schedStmtParser comma)
@@ -128,9 +123,9 @@ vmodInfoParser = do
   (width, init, size) <- brackets $ do
     try (reserved "clock" >> parseOscLine >> comma >> reserved "reset" >> parseWireLine) <|>
       (reserved "reset" >> parseWireLine >> comma >> reserved "clock" >> parseOscLine)
-    width <- option (Expr None []) (try $ comma >> ((try concatParser) <|> noneParser))
-    init <- option (Expr None []) (try $ comma >> ((try concatParser) <|> noneParser))
-    size <- option (Expr None []) (try $ comma >> ((try concatParser) <|> noneParser))
+    width <- option (Expr None []) (comma >> (try concatParser))
+    init <- option (Expr None []) (comma >> (try concatParser))
+    size <- option (Expr None []) (comma >> (try concatParser))
     return (width, init, size)
   return (meths, sched, width, init, size)
 
