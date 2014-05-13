@@ -1,6 +1,7 @@
 module PrettyPrint where
 import DataTypes
 import Netlist
+import ModuleParser
 import System.IO
 import Text.Parsec
 import Text.Parsec.String
@@ -10,26 +11,36 @@ import Data.List as List
 import Control.Applicative
 
 
---main :: IO ()
---main = do
---	filenameinput <- getLine
---	filenameoutput <- getLine
---	parsed <- parseFromFile modulesParser filenameinput
---	case parsed of
---    		Left _ -> putStrLn "Parse error: You think I will provide you usefull information to help you to debug your code: Not at all"
---    		Right mods -> do
---      			let modIfcs = List.foldl (\acc m -> buildModuleIfc acc m) empty mods
---      			let netlist = prettyPrint undefined
---			writeFile filenameoutput netlist
---			return ()
---
+main :: IO ()
+main = do
+	filenameinput <- getLine
+	filenameoutput <- getLine
+	parsed <- parseFromFile modulesParser filenameinput
+	case parsed of
+    		Left _ -> putStrLn "Parse error: You think I will provide you usefull information to help you to debug your code: Not at all"
+    		Right mods -> appendFile filenameoutput 
+				. snd $ (List.foldl (\(acc,str) m -> 
+      					let modIfcs = buildModuleIfc acc m
+					    mName = moduleName m
+					    mapBinds = bindings m
+					    mapInsts = instances m
+					    mapMeths = methods m
+					    listFps = fps m
+					    listRules = Map.keys $ rules m
+					    schedulerInf = undefined
+					    netlist = prettyPrint (mName,mapBinds,mapInsts,listRules,mapMeths,listFps,schedulerInf) 
+					    in  ( modIfcs ,str ++ netlist))
+						   (Map.empty,"")
+						   mods)
+
+
 
 prettyPrint (mName,
 		mapBinds,
 		mapInsts,
 		listRules,
 		mapMeths,
-		mapFps,
+		listFps,
 		schedulerInf) =
 	"module" ++ mName ++ ";\n" ++	
 	concat (List.map 
@@ -46,8 +57,8 @@ prettyPrint (mName,
 		$ Map.assocs mapMeths)
 	++
 	concat (List.map 
-		(\(n,fp) -> prettyPrintDefinedMethod (n, extractSize $ fpType fp ,fpArgs fp))   
-		$ Map.assocs mapFps)
+		(\(fp) -> prettyPrintDefinedMethod (fpName fp, extractSize $ fpType fp ,fpArgs fp))   
+		$ listFps)
 	++
 	concat (List.map 
 		(\(n,inst) -> prettyPrintInst (n,inst))   
