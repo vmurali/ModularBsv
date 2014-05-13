@@ -16,7 +16,7 @@ mcallNoIfParser = do
   (name, args) <- finalMCallParser
   return $ Calleds "1'b1" name args
 
-mcallParser = try mcallIfParser <|> try mcallNoIfParser
+mcallParser = try mcallIfParser <|> mcallNoIfParser
 
 ruleParser = do
   reserved "rule"
