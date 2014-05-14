@@ -19,53 +19,67 @@ main = do
 	filenameinput <- getLine
 	parsed <- parseFromFile modulesParser filenameinput
 	case parsed of
-    	--	Left _ -> putStrLn "Parse error: You think I will provide you useful information to help you debug your code: Not at all"
-    		Left error -> putStrLn $ show error
-    		Right mods -> do
-				putStrLn ( show mods)
-				putStrLn . snd $ (List.foldl (\(acc,str) m -> 
-      					let modIfcs = buildModuleIfc acc m
-					    mName = moduleName m
-					    mapBinds = bindings m
-					    mapInsts = instances m
-					    mapMeths = methods m
-					    listFps = fps m
-					    listRules = Map.keys $ rules m
-					    schedulerInf = scheduler modIfcs m 
-					    netlist = prettyPrint (mName,mapBinds,mapInsts,listRules,mapMeths,listFps,schedulerInf) 
-					    in  ( modIfcs ,str ++ netlist))
-						   (initialIfcs,"")
-						   mods)
+ 	--	Left _ -> putStrLn "Parse error: You think I will provide you useful information to help you debug your code: Not at all"
+		Left error -> putStrLn $ show error
+		Right mods -> do
+		putStrLn ( show mods)
+		putStrLn . snd $ (List.foldl (\(acc,str) m -> 
+			let
+				modIfcs = buildModuleIfc acc m
+				mName = moduleName m
+				mapBinds = bindings m
+				mapInsts = instances m
+				mapMeths = methods m
+				listFps = fps m
+				listRules = Map.keys $ rules m
+				schedulerInf = scheduler modIfcs m 
+				netlist = prettyPrint (mName,mapBinds,mapInsts,listRules,mapMeths,listFps,schedulerInf) 
+				in ( modIfcs ,str ++ netlist))
+					(initialIfcs,"")
+					mods)
 
 initialIfcs = fromList [("mkEHR", ehrIfc), ("mkRegFile", regFileIfc)]
 
+wireSize int = if int > 1
+	then "[" ++ show (int - 1) ++ ":0] "
+	else ""
+
+data WhichMeth = FP | DEF
+
+getMethNames which name typ args =
+	(case which of {FP -> "input "; DEF -> "output "}, "", "RDY_" ++ name):
+	(case typ of
+		Value 0 -> []
+		otherwise -> [(case which of {FP -> "output "; DEF -> "input "}, "", "EN_" ++ name)] ) ++
+	(case typ of
+		Value size -> [(case which of {FP -> "input "; DEF -> "output "}, wireSize size, name)]
+		otherwise -> [] ) ++
+	[(case which of {FP -> "output "; DEF -> "input "}, wireSize y, x) | (x, y) <- args]
+
+getModuleFpDefNames fs ds = concat $
+	[getMethNames FP name typ args | Fp name typ args <- fs] ++
+		[getMethNames DEF name typ args | (name, Method typ args _) <- Map.toList ds]
+
 prettyPrint (mName,
-		mapBinds,
-		mapInsts,
-		listRules,
-		mapMeths,
-		listFps,
-		schedulerInf) =
+	mapBinds,
+	mapInsts,
+	listRules,
+	mapMeths,
+	listFps,
+	schedulerInf) =
 	if mName == "mkEHR" || mName == "mkRegFile"  
 		then "" 
 		else
-			"module " ++ mName ++"(CLK, RST_N" ++ concat [", " ++ x | x <- lotOfFpMeth, x/= []] ++");\n" ++
+			"module " ++ mName ++"(CLK, RST_N" ++ concat [", " ++ z | (_, _, z) <- fpDefNames] ++");\n" ++
+			concat [ "\t" ++ x ++ y ++ z ++ ";\n"| (x, y, z) <- fpDefNames] ++
 			concat (List.map 
 				(\(n,bind) -> prettyPrintBindW (n,bind))   
 				$ Map.toList mapBinds)
 			++
 			concat (List.map 
-				(\n-> "wire "++ "RDY_"++n++";\n"
-					++ "wire "++ "EN_"++n++";\n")
+				(\n-> "\twire "++ "RDY_"++n++";\n"
+					++ "\twire "++ "EN_"++n++";\n")
 				$ listRules)
-			++
-			concat (List.map 
-				(\(n,meth) -> prettyPrintMethod (n, extractSize $ methodType meth ,methodArgs meth))   
-				$ Map.toList mapMeths)
-			++
-			concat (List.map 
-				(\(fp) -> prettyPrintFp (fpName fp, extractSize $ fpType fp ,fpArgs fp))   
-				$ listFps)
 			++
 			concat (List.map 
 				(\(n,inst) -> prettyPrintInst (n,inst))   
@@ -74,50 +88,41 @@ prettyPrint (mName,
 			concat (List.map 
 				(\(n,bind) -> prettyPrintBindA (n,bind))   
 				$ Map.toList mapBinds)
+			{-
 			++
 			concat (List.map 
 				(\(n,l) -> prettyPrintSched n l) 
 				$ Map.toList schedulerInf)
+			-}
 			++ "endmodule\n"
 
 	where
-		getForOneMethod ty n args = 	["RDY_" ++ n
-						, case ty of
-							Action -> "" 
-							otherwise -> n
-						, case (ty,args) of 
-							(Value _,[]) -> "" 
-							otherwise -> "EN_"++n
-						] ++ fmap fst args  
-		lotOfFpMeth =  concat $ [getForOneMethod ty n args | Fp n ty args <- listFps]  ++ [getForOneMethod ty n args | (n, Method ty args _) <- Map.toList mapMeths]
+		fpDefNames = getModuleFpDefNames listFps mapMeths
 		extractSize t = case t of
 					Value i -> i
 					Action -> -1  -- Microhack to simulate the absence of size
 					ActionValue i -> i  
-
 
 prettyPrintFp (n,size,args) =
 	prettyPrintMethod ("fp1_" ++ n, size, [("fp1_" ++ x,y) | (x,y) <- args]) ++
 	prettyPrintMethod ("fp2_" ++ n, size, [("fp2_" ++ x,y) | (x,y) <- args])
 
 prettyPrintMethod (n,size,args)=
-	(if size /= -1 then "input " ++ wireSize size ++ n ++ " ;\n" else "") ++ 
-	"input " ++ "RDY_" ++ n ++ " ;\n" ++ 
-	"output " ++ "EN_" ++ n ++ " ;\n" ++
+	(if size /= -1 then "\tinput " ++ wireSize size ++ n ++ " ;\n" else "") ++ 
+	"\tinput " ++ "RDY_" ++ n ++ " ;\n" ++ 
+	"\toutput " ++ "EN_" ++ n ++ " ;\n" ++
 	concatMap
-		(\(arg,s) -> "output " ++ wireSize s ++ arg ++ ";\n" )
+		(\(arg,s) -> "\toutput " ++ wireSize s ++ arg ++ ";\n" )
 		args	
 
-
-
 prettyPrintInst (name,inst) =
-	name ++
+	"\t" ++ name ++
 	" " ++
 	(instModule inst) ++
 	case (instWidth inst,instInit inst, instSize inst) of
 		(Expr None _ ,Expr None _ ,Expr None _ ) -> "\n" 
 		otherwise -> "#(" ++ (intercalate "," . Maybe.catMaybes $ [showExp . instWidth, showExp . instInit , showExp . instSize] <*> [inst] ) ++");\n" 
-	++ "("
+	++ "(.CLK(CLK), .RST_N(RST_N)"
 	++ intercalate
 		","
 		(List.map 
@@ -131,12 +136,8 @@ prettyPrintInst (name,inst) =
 			[a] -> a 	 
 			otherwise -> "{"++intercalate "," l  ++ "}" 	
 
-wireSize int = if int > 1
-	then "[" ++ show (int - 1) ++ ":0] "
-	else ""
-
 prettyPrintBindW (bn, Binding ba bz bexpr) = 
-  "wire " ++ case ba of 
+  "\twire " ++ case ba of 
 			Nothing -> ""
 			Just val -> wireSize val
   ++ wireSize bz
@@ -144,7 +145,7 @@ prettyPrintBindW (bn, Binding ba bz bexpr) =
 
 
 prettyPrintBindA (bn, Binding ba bz bexpr) = 
-	"assign " ++ bn ++ " = " ++
+	"\tassign " ++ bn ++ " = " ++
 	prettyPrintExp bexpr ++ ";\n"
 
 
@@ -163,7 +164,7 @@ prettyPrintExp (Expr op listArgs) = case op of
 	Rdy n -> "undefined"
 
 prettyPrintSched (x,y) l =
-	"assign EN_" ++ y ++ " = 1'b1" ++ concatMap (\(a,b) -> " && ! " ++ printTerm (a,b)  ) l ++ ";\n"
+	"\tassign EN_" ++ y ++ " = 1'b1" ++ concatMap (\(a,b) -> " && ! " ++ printTerm (a,b)  ) l ++ ";\n"
 	where
 		printTerm (a,b) = if a == "fp" || a == "this" 
 				then "EN_" ++ b else "EN_" ++ a ++ "_" ++ b 
