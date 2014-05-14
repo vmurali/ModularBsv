@@ -62,22 +62,26 @@ module mkEhr#(t init)(Ehr#(n, t)) provisos(Bits#(t, tSz));
   Ehr#(n, t) r = newVector;
   EHR#(t) e <- mkEHR(init);
 
+  if(valueOf(n) > 0)
   r[0] = (interface Reg;
             method _write = e.w0;
             method _read = e.r0;
           endinterface);
+  if(valueOf(n) > 1)
   r[1] = (interface Reg;
             method _write = e.w1;
             method _read = e.r1;
           endinterface);
-//  r[2] = (interface Reg;
-//            method _write = e.w2;
-//            method _read = e.r2;
-//          endinterface);
-//  r[3] = (interface Reg;
-//            method _write = e.w3;
-//            method _read = e.r3;
-//          endinterface);
+  if(valueOf(n) > 2)
+  r[2] = (interface Reg;
+            method _write = e.w2;
+            method _read = e.r2;
+          endinterface);
+  if(valueOf(n) > 3)
+  r[3] = (interface Reg;
+            method _write = e.w3;
+            method _read = e.r3;
+          endinterface);
   for(Integer i = 4; i < valueOf(n); i=i+1)
   r[i] = (interface Reg;
             method _write(x) = noAction;
