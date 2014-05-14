@@ -106,19 +106,29 @@ prettyPrint modIfcs mName mapBinds mapInsts listRules mapMeths listFps scheduler
 -- TAKE CARE OF EHRs, including their wires
 prettyPrintInst modIfcs (name,inst) =
 	if instModule inst == "mkEHR" --NO INSTANCE SIZE HERE
-		then  	concat [getWireForR i | i <- ehrList ] ++ concat [getWireForW i | i <- ehrList] ++ 
+		then  	concat [getWireForR i ++ getWireForW i | i <- ehrList ] ++ 
 			"\t" ++ name ++ " mkEHR#(" ++ getVal instWidth ++ ", " ++ getVal instInit ++ ")" ++
-			"(" ++ intercalate "," [argsOfEhr i | i<- ehrList] ++ intercalate "," [ enOfEhr i | i<- ehrList]  ++ ");\n"
+			"(.CLK(CLK), .RST_N(RST_N)" ++ 	concat [valueOfEhr i ++   argsOfEhr i ++ enOfEhr i  | i<- ehrList] ++ 
+							 ");\n"
 		else if instModule inst == "mkRegFile"
 			then "\twire [" ++ getVal instSize ++ "-1:0] " ++ name ++ "$sub_x;\n" ++
 				"\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$sub;\n" ++
 				"\twire " ++ name ++ "$EN_sub;\n" ++
+				"\twire " ++ name ++ "$RDY_sub;\n" ++
 				"\twire [" ++ getVal instSize ++ "-1:0] " ++ name ++ "$upd_x;\n" ++
 				"\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$upd_y;\n" ++
 				"\twire " ++ name ++ "$EN_upd;\n" ++
+				"\twire " ++ name ++ "$RDY_upd;\n" ++
 				"\t" ++ name ++ " mkRegFile#(" ++ getVal instSize ++ ", " ++ getVal instWidth ++ ", " ++ getVal instInit ++ ")" ++
-				"(.sub_x(" ++ name ++ "$sub_x), .sub(" ++ name ++ "$sub), .EN_sub(" ++ name ++ "$EN_sub), .upd_x(" ++ name ++ "$upd_x), .upd_y(" ++
-				name ++ "$upd_y), .EN_upd(" ++ name ++ "$EN_upd));\n"
+				"(.CLK(CLK), .RST_N(RST_N)"	
+								++ printArg "sub_s" name 
+								++ printArg "sub" name
+								++ printArg "EN_sub" name
+								++ printArg "RDY_sub" name
+								++ printArg "upd_x" name 
+								++ printArg "upd_y" name
+								++ printArg "EN_upd" name 
+								++ printArg "RDY_upd" name ++ "));\n"
 			else
 				fpDefInstsW ++
 				"\t" ++ name ++
@@ -128,11 +138,15 @@ prettyPrintInst modIfcs (name,inst) =
 				fpDefInstsAll ++
 				");\n"
 	where
-		getWireForR i = "\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$r"++ show i ++";\n" 
+		printArg n1 n2 = ", ."++n1++"("++n2++"$"++n1++")"
+		getWireForR i = "\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$r"++ show i ++";\n" ++ 
+				"\twire " ++ name ++ "$RDY_r"++ show i ++";\n" 
 		getWireForW i = "\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$w"++ show i ++"_x;\n" ++
-				"\twire " ++ name ++ "$EN_w"++ show i ++";\n" 
-		argsOfEhr i = " .w"++ show i ++"_x(" ++ name ++ "$w"++ show i ++"_x)"
-		enOfEhr i = " .EN_w"++ show i ++"("++name++"$EN_w"++ show i ++")"
+				"\twire " ++ name ++ "$EN_w"++ show i ++";\n"++ 
+				"\twire " ++ name ++ "$RDY_w"++ show i ++";\n" 
+		argsOfEhr i = printArg ("w"++show i++"_x") name 
+		enOfEhr i =  printArg ("EN_w"++show i) name ++ printArg ("RDY_r" ++ show i) name 
+		valueOfEhr i =  printArg ("r"++show i) name ++ printArg ("RDY_r" ++ show i) name 
 		getVal f = let Expr _ args = (f inst) in head args
 		fpDefInsts = getModuleFpDefNames (fpsInModule mod) (Map.map (\(typ, args, _) -> (Method typ args [])) $ methodsInModule mod)
 			where mod = modIfcs Map.! instModule inst
