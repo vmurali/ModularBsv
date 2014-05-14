@@ -57,6 +57,20 @@ buildModuleIfc :: ModuleIfcs -> Module -> ModuleIfcs
 buildModuleIfc modIfcs mod = let gMod = getModuleIfc modIfcs mod in
   insert (moduleName mod) gMod modIfcs
 
+ehrList = [0..2]
+
+ehrIfc = ModuleIfc []
+  (fromList $ [("r" ++ show x, (True, [], [])) | x <- ehrList] ++ [("w" ++ show x, (False, ["x"], [])) | x <- ehrList])
+  (fromList $
+      ([(("r" ++ show x, "r" ++ show y), if x < y then SB else if x == y then CF else SA)| x <- ehrList, y <- ehrList] ++
+       [(("r" ++ show x, "w" ++ show y), if x <= y then SB else SA)| x <- ehrList, y <- ehrList] ++
+       [(("w" ++ show x, "r" ++ show y), if x < y then SB else SA)| x <- ehrList, y <- ehrList] ++
+       [(("w" ++ show x, "w" ++ show y), if x < y then SB else if x == y then C else SA)| x <- ehrList, y <- ehrList]))
+
+regFileIfc = ModuleIfc []
+  (fromList [("sub", (False, ["x"], [])), ("upd", (False, ["x", "y"], []))])
+  (fromList [(("sub", "sub"), C), (("upd", "upd"), C), (("sub", "upd"), SB), (("upd", "sub"), SA)])
+
 main = do
   fileName <- getLine
   parsed <- parseFromFile modulesParser fileName
@@ -65,7 +79,7 @@ main = do
   case (parsed) of
     Left error -> putStrLn $ show error
     Right mods -> do
-      let modIfcs = Prelude.foldl (\acc m -> buildModuleIfc acc m) empty mods
+      let modIfcs = Prelude.foldl (\acc m -> buildModuleIfc acc m) (fromList [("mkEHR", ehrIfc), ("mkRegFile", regFileIfc)]) mods
       --putStrLn $ show mods
       --putStrLn $ show [(moduleName mod, priorityList mod) | mod <- mods]
       let allInfos = [allInfo modIfcs x| x <- mods]

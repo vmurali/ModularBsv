@@ -83,6 +83,8 @@ moduleParser = do
 modulesParser = do
   ms <- many $ moduleParser
   eof
+  return ms
+{-
   return $ ehr : regFile : ms
 
 regFile = Module
@@ -113,3 +115,4 @@ ehr = Module
        [(("w" ++ show x, "w" ++ show y), if x < y then SB else if x == y then C else SA)| x <- ehrList, y <- ehrList])
   , priorityList = []
   }
+-}

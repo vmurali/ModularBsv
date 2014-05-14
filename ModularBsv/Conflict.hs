@@ -101,14 +101,11 @@ fullCm ::
   -> PriorityElem
   -> Conflict
 fullCm moduleIfcs mod (m1, x1) (m2, x2) =
-  if primitive mod 
-	then fpConflict mod Map.! (x1,x2) 
-	else 
- 		 if thisM m1 && thisM m2 && x1 == x2 && Map.member x1 (methods mod)
- 		   then if margs == [] && isValue
- 		          then CF
- 		          else C
- 		   else   joins [cmCalledMethods moduleIfcs mod p q | p <- hs1, q <- hs2]
+ if thisM m1 && thisM m2 && x1 == x2 && Map.member x1 (methods mod)
+   then if margs == [] && isValue
+          then CF
+          else C
+   else   joins [cmCalledMethods moduleIfcs mod p q | p <- hs1, q <- hs2]
   where
     margs = methodArgs $ methods mod Map.! x1
     mtype = methodType $ methods mod Map.! x1
