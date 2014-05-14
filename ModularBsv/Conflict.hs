@@ -45,27 +45,10 @@ toActualArgs ::
 toActualArgs moduleIfcs mod (m1, h1) =
   foldl (\acc x -> (fpsToArgs Map.! x) : acc) [] fpsMeth
   where
-    (_, _, fpsMeth) = (methodsInModule $ (moduleIfcs Map.! (instToModule mod m1))) Map.!  h1 --FUCKINGERRORHERE
+    (_, _, fpsMeth) = (methodsInModule $ (moduleIfcs Map.! (instToModule mod m1))) Map.!  h1 
     fpsMod = fpsInModule (moduleIfcs Map.! (instToModule mod m1))
     fpsToArgs = Map.fromList $ zip fpsMod (instToArgs mod m1)
 
---cmCalledMethods ::
---  ModuleIfcs
---  -> Module
---  -> CalledMethod
---  -> CalledMethod
---  -> Conflict
---cmCalledMethods moduleIfcs mod (m1, h1) (m2, h2)
---  | m1 == "fp" || m1 == "fp1" || m1 == "fp2" , m2 == "fp" || m2 == "fp1" || m2 == "fp2" = fpConflict mod Map.! (h1, h2)
---  | m1 == m2 = (cmForMethodsInModule $ moduleIfcs Map.! (instToModule mod m1)) Map.! (h1,h2)
---  | m1 == "fp" || m1 == "fp1" || m1 == "fp2" = joins [cmCalledMethods moduleIfcs mod (m1, h1) q | q <- actCalles2]
---  | m2 == "fp" || m2 == "fp1" || m2 == "fp2" = joins [cmCalledMethods moduleIfcs mod p (m2, h2) | p <- actCalles1]
---  | m1 == "this" = joins [cmCalledMethods moduleIfcs mod p (m2, h2) | p <- getCalled mod h1] --hack
---  | m2 == "this" = joins [cmCalledMethods moduleIfcs mod (m1, h1) q | q <- getCalled mod h2] --hack
---  | otherwise = joins [cmCalledMethods moduleIfcs mod p q | p <- actCalles1, q <- actCalles2]
---  where
---    actCalles1 = toActualArgs moduleIfcs mod (m1, h1)
---    actCalles2 = toActualArgs moduleIfcs mod (m2, h2)
 
 cmCalledMethods :: ModuleIfcs -> Module -> CalledMethod -> CalledMethod -> Conflict
 cmCalledMethods modIfcs mod x y = joins . map (basicConflict modIfcs mod) . Set.elems $ dependenciesAll modIfcs mod (x,y)
@@ -113,10 +96,10 @@ fullCm moduleIfcs mod (m1, x1) (m2, x2) =
                 Value _ -> True
                 otherwise -> False
     hs1 = if thisM m1 && (Map.member x1 (rules mod) || Map.member x1 (methods mod))
-            then {-if primitive mod then fefgefef else-} getCalled mod x1
+            then getCalled mod x1
             else [(m1, x1)]
     hs2 = if thisM m2 && (Map.member x2 (rules mod) || Map.member x2 (methods mod))
-            then {-if primitive mod then efe e fe else-} getCalled mod x2
+            then getCalled mod x2
             else [(m2, x2)]
 
 primitive mod = moduleName mod == "mkRegFile" || moduleName mod == "mkEHR" 

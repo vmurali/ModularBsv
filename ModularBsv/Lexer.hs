@@ -36,7 +36,7 @@ constant = do
   char '\''
   base <- oneOf "bdohBDOH"
   val <- integer
-  return $ (show size) ++ "\'" ++ show base ++ show val
+  return $ (show size) ++ "\'" ++ [base] ++ show val
 
 quotedString = do
   xs <- between (symbol "\"") (symbol "\"") (many $ noneOf "\"")

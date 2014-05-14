@@ -1,4 +1,4 @@
---module Netlist where
+module Netlist where
 
 import DataTypes
 import CalledMethods
@@ -71,7 +71,7 @@ regFileIfc = ModuleIfc []
   (fromList [("sub", (False, ["x"], [])), ("upd", (False, ["x", "y"], []))])
   (fromList [(("sub", "sub"), C), (("upd", "upd"), C), (("sub", "upd"), SB), (("upd", "sub"), SA)])
 
-main = do
+{-main = do
   fileName <- getLine
   parsed <- parseFromFile modulesParser fileName
   --input <- getContents
@@ -94,4 +94,4 @@ main = do
       --putStrLn $ show (calledm1504, calledm1505, calledm1506)
       --putStrLn $ show (length calledms)
       --putStrLn $ show (calledms !! 1504, calledms !! 1505, calledms !! 1506)
-      return ()
+      return ()-}
