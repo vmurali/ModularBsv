@@ -139,13 +139,12 @@ module mkProc(Proc);
 
   //Instantiating all the state elements of the processor.
 
-  (* doc = "[this.r1 this.r2] [this.b1] [rf.rd1 rf.rd2]"*)
+ // (* doc = "[this.r1 this.r2] [this.b1]"*)
   let fp1 <- mkProc_fp;
   let fp2 <- mkProc_fp;
   let sb <- mkSb;
 
   // Architectural State
-  (* doc = "[rf.rd2 rf.rd1]" *)
   Reg#(Addr) pc <- mkRegU;
   RFile      rf <- mkRFile;
   Memory    mem <- mkMemory;
