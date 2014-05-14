@@ -11,7 +11,7 @@ import Data.Map as Map
 import Data.Maybe as Maybe
 import Data.List as List
 import Control.Applicative
-
+import Text.Read as Read
 
 
 main :: IO ()
@@ -100,13 +100,21 @@ prettyPrint modIfcs mName mapBinds mapInsts listRules mapMeths listFps scheduler
 -}
 
 
--- TAKE CARE OF EHRs and mkRegFile, including their wires
+-- TAKE CARE OF EHRs, including their wires
 prettyPrintInst modIfcs (name,inst) =
-	if name == "mkEHR"
+	if instModule inst == "mkEHR"
 		then ""
 			--"\t" ++ name ++ " mkEHR#(" show instWidth inst ++ ")();\n"
-		else if name == "mkRegFile"
-			then "\twire []"
+		else if instModule inst == "mkRegFile"
+			then "\twire [" ++ getVal instSize ++ "-1:0] " ++ name ++ "$sub_x;\n" ++
+				"\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$sub;\n" ++
+				"\twire " ++ name ++ "$EN_sub;\n" ++
+				"\twire [" ++ getVal instSize ++ "-1:0] " ++ name ++ "$upd_x;\n" ++
+				"\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$upd_y;\n" ++
+				"\twire " ++ name ++ "$EN_upd;\n" ++
+				"\t" ++ name ++ " mkRegFile#(" ++ getVal instSize ++ ", " ++ getVal instWidth ++ ", " ++ getVal instInit ++ ")" ++
+				"(.sub_x(" ++ name ++ "$sub_x), .sub(" ++ name ++ "$sub), .EN_sub(" ++ name ++ "$EN_sub), .upd_x(" ++ name ++ "$upd_x), .upd_y(" ++
+				name ++ "$upd_y), .EN_upd(" ++ name ++ "$EN_upd));\n"
 			else
 				fpDefInstsW ++
 				"\t" ++ name ++
@@ -116,6 +124,7 @@ prettyPrintInst modIfcs (name,inst) =
 				fpDefInstsAll ++
 				");\n"
 	where
+		getVal f = let Expr _ args = (f inst) in head args
 		fpDefInsts = getModuleFpDefNames (fpsInModule mod) (Map.map (\(typ, args, _) -> (Method typ args [])) $ methodsInModule mod)
 			where mod = modIfcs Map.! instModule inst
 		fpDefInstsW = concat [ "\t wire " ++ y ++ name ++ "$" ++ z ++ ";\n" | (_, y, z) <- fpDefInsts]
