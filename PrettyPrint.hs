@@ -99,12 +99,16 @@ prettyPrint modIfcs mName mapBinds mapInsts listRules mapMeths listFps scheduler
 					otherwise -> "#(" ++ (intercalate "," . Maybe.catMaybes $ [showExp . instWidth, showExp . instInit , showExp . instSize] <*> [inst] ) ++");\n" 
 -}
 
+---b) EHRs - they should be handled very similar to how I have handle mkRegFile, except that the number of methods in mkEHR is based on ehrList [0..3] or whatever. The r0, r1, r2 methods have no parameters only result (so no EN, and no r0_x), and w0, w1, w2 methods have exactly one parameter w0_x, and no result. They have to be written for a parametric ehrList
+---
+---Can you take care of these two.
 
 -- TAKE CARE OF EHRs, including their wires
 prettyPrintInst modIfcs (name,inst) =
-	if instModule inst == "mkEHR"
-		then ""
-			--"\t" ++ name ++ " mkEHR#(" show instWidth inst ++ ")();\n"
+	if instModule inst == "mkEHR" --NO INSTANCE SIZE HERE
+		then  	concat [getWireForR i | i <- ehrList ] ++ concat [getWireForW i | i <- ehrList] ++ 
+			"\t" ++ name ++ " mkEHR#(" ++ getVal instWidth ++ ", " ++ getVal instInit ++ ")" ++
+			"(" ++ intercalate "," [argsOfEhr i | i<- ehrList] ++ intercalate "," [ enOfEhr i | i<- ehrList]  ++ ");\n"
 		else if instModule inst == "mkRegFile"
 			then "\twire [" ++ getVal instSize ++ "-1:0] " ++ name ++ "$sub_x;\n" ++
 				"\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$sub;\n" ++
@@ -119,11 +123,16 @@ prettyPrintInst modIfcs (name,inst) =
 				fpDefInstsW ++
 				"\t" ++ name ++
 				" " ++
-				(instModule inst) ++
+				(instModule inst) ++ --TODO I THINK WE NEED A \n here
 				"(.CLK(CLK), .RST_N(RST_N)" ++
 				fpDefInstsAll ++
 				");\n"
 	where
+		getWireForR i = "\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$r"++ show i ++";\n" 
+		getWireForW i = "\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$w"++ show i ++"_x;\n" ++
+				"\twire " ++ name ++ "$EN_w"++ show i ++";\n" 
+		argsOfEhr i = " .w"++ show i ++"_x(" ++ name ++ "$w"++ show i ++"_x)"
+		enOfEhr i = " .EN_w"++ show i ++"("++name++"$EN_w"++ show i ++")"
 		getVal f = let Expr _ args = (f inst) in head args
 		fpDefInsts = getModuleFpDefNames (fpsInModule mod) (Map.map (\(typ, args, _) -> (Method typ args [])) $ methodsInModule mod)
 			where mod = modIfcs Map.! instModule inst
