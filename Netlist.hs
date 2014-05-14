@@ -42,7 +42,7 @@ getModuleIfc ::
   -> ModuleIfc
 getModuleIfc modIfcs mod =
   ModuleIfc
-    [x | Fp x _ _ <- fps mod]
+    (fps mod)
     (fromList [(k, (isV0 k, args k, fpu modIfcs mod k)) | k <- meths])
     (fromList [((k1, k2), fullCm modIfcs mod ("this",k1) ("this",k2)) | k1 <- meths, k2 <- meths ])
   where

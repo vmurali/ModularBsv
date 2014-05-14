@@ -96,10 +96,6 @@ prettyPrint (mName,
 
 	where
 		fpDefNames = getModuleFpDefNames listFps mapMeths
-		extractSize t = case t of
-					Value i -> i
-					Action -> -1  -- Microhack to simulate the absence of size
-					ActionValue i -> i  
 
 prettyPrintFp (n,size,args) =
 	prettyPrintMethod ("fp1_" ++ n, size, [("fp1_" ++ x,y) | (x,y) <- args]) ++

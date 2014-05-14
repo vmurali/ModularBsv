@@ -46,7 +46,7 @@ toActualArgs moduleIfcs mod (m1, h1) = List.nub $
   foldl (\acc x -> (fpsToArgs Map.! x) : acc) [] fpsMeth
   where
     (_, _, fpsMeth) = (methodsInModule $ (moduleIfcs Map.! (instToModule mod m1))) Map.!  h1 
-    fpsMod = fpsInModule (moduleIfcs Map.! (instToModule mod m1))
+    fpsMod = map fpName $ fpsInModule (moduleIfcs Map.! (instToModule mod m1))
     fpsToArgs = Map.fromList $ zip fpsMod (instToArgs mod m1)
 
 {-

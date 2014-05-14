@@ -30,14 +30,14 @@ schedulerBase modIfcs mod a =
     newrules = filter (\x -> not $ Set.member ("this", x) flatList) (Map.keys $ rules mod)
     newmethods = filter (\x -> not $ Set.member ("this", x) flatList) (Map.keys $ methods mod)
     newcalledmethods = [map (\y-> (x,y)) $ newcalledmethod x | x <- Map.keys $ instances mod ]  
-    newcalledmethod n  = filter (\x -> not $ Set.member (n, x) flatList) ( fpsInModule $ modIfcs Map.!  (instModule $ instances mod Map.! n) ) 
+    newcalledmethod n  = filter (\x -> not $ Set.member (n, x) flatList) ( map fpName $ fpsInModule $ modIfcs Map.!  (instModule $ instances mod Map.! n) ) 
     newplist = plist ++ map (\x-> [("this",x)]) newrules ++ (filter ((/=)[]) $ [map (\x-> ("this",x)) newmethods] ++ newcalledmethods)  
     isDefMeth (m, h) = m == "this" && (Map.member h $ methods mod)
     isRule (m, h) = m == "this" && (Map.member h $ rules mod)
     conflict x y = fullCm modIfcs mod (process x) (process y)
     process (m, h) = if not (isDefMeth (m, h)) && not (isRule (m, h))
                        then  ( (Map.fromList
-                                 (zip (fpsInModule $ modIfcs Map.! (instModule $instances mod Map.! m))
+                                 (zip (map fpName $ fpsInModule $ modIfcs Map.! (instModule $instances mod Map.! m))
                                    (instArgs $ instances mod Map.! m))) Map.! h)
                        else  (m, h)
     notOrder a b = conflict a b /= SB && conflict a b /= CF
