@@ -30,6 +30,13 @@ wordParser = do
 --  ids <- sepBy1 terminal (reservedOp "++")
 --  return $ Expr (Word "concat") ids
 
+rdyCallParser = do
+  m <- identifier
+  dot
+  symbol "RDY_"
+  h <- identifier
+  return $ Expr (Rdy (m,h)) []
+
 methCallParser = do
   (name, args) <- finalMCallParser
   return $ Expr (MethCall name) args
@@ -37,7 +44,7 @@ methCallParser = do
 -- Order is important
 exprParser =
   choice [try (do{val <- x; semi; return val}) |
-          x <- [methCallParser, concatParser, 
+          x <- [rdyCallParser, methCallParser, concatParser, 
                 binaryParser, unaryParser, wordParser]]
 --                noneParser, unaryParser, binaryParser,
 --                wordParser, concatParser, methCallParser]]

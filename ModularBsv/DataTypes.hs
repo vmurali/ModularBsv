@@ -19,6 +19,7 @@ data Op
   | Unary String
   | Binary String
   | Word String
+  | Rdy CalledMethod
   | MethCall CalledMethod
   deriving (Show, Eq, Ord)
 
