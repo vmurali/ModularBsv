@@ -66,28 +66,3 @@ ehrIfc = ModuleIfc []
 regFileIfc = ModuleIfc []
   (fromList [("sub", (Value 1, [("x", 0)], [])), ("upd", (Action, [("x", 0), ("y", 0)], []))])
   (fromList [(("sub", "sub"), C), (("upd", "upd"), C), (("sub", "upd"), SB), (("upd", "sub"), SA)])
-
-{-main = do
-  fileName <- getLine
-  parsed <- parseFromFile modulesParser fileName
-  --input <- getContents
-  --let parsed = parse modulesParser "" input
-  case (parsed) of
-    Left error -> putStrLn $ show error
-    Right mods -> do
-      let modIfcs = Prelude.foldl (\acc m -> buildModuleIfc acc m) (fromList [("mkEHR", ehrIfc), ("mkRegFile", regFileIfc)]) mods
-      --putStrLn $ show mods
-      --putStrLn $ show [(moduleName mod, priorityList mod) | mod <- mods]
-      let allInfos = [allInfo modIfcs x| x <- mods]
-      let fcalledms = [(name,s)| (name, bs, _, _, _, f, calledms, s) <- allInfos]
-      putStrLn $ show fcalledms
-      --let (bsproc, fproc, cmsproc) = head [(bs, f, calledms) | (name, bs, f, calledms) <- fcalledms, name == "mkProc"]
-      --putStrLn $ show $ (keys cmsproc)
-      --putStrLn $ show $ length $ concat [y | (x, Binding _ _ (Expr _ y)) <- toList bsproc]
-      --putStrLn $ show $ length (keys bsproc)
-      --putStrLn $ show [(cm, fproc cm)| cm <- keys cmsproc]
-      --putStrLn $ show $ ([(moduleName mod, getBothCaller mod ("thomas", "murali")) | mod <- mods])
-      --putStrLn $ show (calledm1504, calledm1505, calledm1506)
-      --putStrLn $ show (length calledms)
-      --putStrLn $ show (calledms !! 1504, calledms !! 1505, calledms !! 1506)
-      return ()-}
