@@ -86,7 +86,7 @@ prettyPrint (mName,
 				$ Map.toList mapInsts )
 			++
 			concat (List.map 
-				(\(n,bind) -> prettyPrintBindA (n,bind))   
+				(\(n,bind) -> prettyPrintBindA mapBinds (n,bind))   
 				$ Map.toList mapBinds)
 			++
 			concat (List.map 
@@ -138,12 +138,12 @@ prettyPrintBindW (bn, Binding ba bz bexpr) =
   ++ bn ++ " ;\n"
 
 
-prettyPrintBindA (bn, Binding ba bz bexpr) = 
+prettyPrintBindA mapBinds (bn, Binding ba bz bexpr) = 
 	"\tassign " ++ bn ++ " = " ++
-	prettyPrintExp bexpr ++ ";\n"
+	prettyPrintExp mapBinds bexpr ++ ";\n"
 
 
-prettyPrintExp (Expr op listArgs) = case op of 
+prettyPrintExp mapBinds (Expr op listArgs) = case op of 
 	None -> intercalate " " listArgs  
 	Unary s -> s ++ intercalate " " listArgs 
 	Binary s 
@@ -153,9 +153,14 @@ prettyPrintExp (Expr op listArgs) = case op of
 		| s == "concat" -> "{ " ++ intercalate (", ") listArgs ++ " }"
 		| s == "extract" -> head listArgs ++ "[ " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2 ++ " ]" 
 		| s == "_if_" -> head listArgs ++ " ? " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2
+		| s == "PrimBuildArray" -> ""
+		| s == "PrimArrayDynSelect" -> "" -- List.foldl (\(count, acc) x -> (count+1, acc ++ " : (" ++ x ++ " == " ++ show count ++ " ? " ++ ))
 		| otherwise -> s  ++ "(" ++ (intercalate ", " listArgs) ++ ")"
-	MethCall c-> "undefined" 
-	Rdy n -> "undefined"
+	MethCall (x,y) -> x ++ "$" ++ y
+	Rdy (x, y) -> x ++ "$RDY_" ++ y
+	where
+		Expr _ arr = bindExpr $ mapBinds Map.! head listArgs
+		sel = listArgs !! 1
 
 prettyPrintSched (x,y) l =
 	"\tassign EN_" ++ y ++ " = 1'b1" ++ concatMap (\(a,b) -> " && ! " ++ printTerm (a,b)  ) l ++ ";\n"
