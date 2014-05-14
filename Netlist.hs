@@ -43,15 +43,11 @@ getModuleIfc ::
 getModuleIfc modIfcs mod =
   ModuleIfc
     (fps mod)
-    (fromList [(k, (isV0 k, args k, fpu modIfcs mod k)) | k <- meths])
+    (fromList [(k, (methodType $ getMeths k, methodArgs $ getMeths k, fpu modIfcs mod k)) | k <- meths])
     (fromList [((k1, k2), fullCm modIfcs mod ("this",k1) ("this",k2)) | k1 <- meths, k2 <- meths ])
   where
     getMeths k = methods mod ! k
     meths = keys $ methods mod
-    isV0 k = case (methodType $ getMeths k) of
-               Value _ -> methodArgs (getMeths k) == []
-               otherwise -> False
-    args k = [x | (x, y) <- methodArgs (getMeths k)]
 
 buildModuleIfc :: ModuleIfcs -> Module -> ModuleIfcs
 buildModuleIfc modIfcs mod = let gMod = getModuleIfc modIfcs mod in
@@ -60,7 +56,7 @@ buildModuleIfc modIfcs mod = let gMod = getModuleIfc modIfcs mod in
 ehrList = [0..2]
 
 ehrIfc = ModuleIfc []
-  (fromList $ [("r" ++ show x, (True, [], [])) | x <- ehrList] ++ [("w" ++ show x, (False, ["x"], [])) | x <- ehrList])
+  (fromList $ [("r" ++ show x, (Value 0, [], [])) | x <- ehrList] ++ [("w" ++ show x, (Action, [("x", 0)], [])) | x <- ehrList])
   (fromList $
       ([(("r" ++ show x, "r" ++ show y), if x < y then SB else if x == y then CF else SA)| x <- ehrList, y <- ehrList] ++
        [(("r" ++ show x, "w" ++ show y), if x <= y then SB else SA)| x <- ehrList, y <- ehrList] ++
@@ -68,7 +64,7 @@ ehrIfc = ModuleIfc []
        [(("w" ++ show x, "w" ++ show y), if x < y then SB else if x == y then C else SA)| x <- ehrList, y <- ehrList]))
 
 regFileIfc = ModuleIfc []
-  (fromList [("sub", (False, ["x"], [])), ("upd", (False, ["x", "y"], []))])
+  (fromList [("sub", (Value 1, [("x", 0)], [])), ("upd", (Action, [("x", 0), ("y", 0)], []))])
   (fromList [(("sub", "sub"), C), (("upd", "upd"), C), (("sub", "upd"), SB), (("upd", "sub"), SA)])
 
 {-main = do

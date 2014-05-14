@@ -33,7 +33,7 @@ main = do
 				listFps = fps m
 				listRules = Map.keys $ rules m
 				schedulerInf = scheduler modIfcs m 
-				netlist = prettyPrint (modIfcs, mName,mapBinds,mapInsts,listRules,mapMeths,listFps,schedulerInf) 
+				netlist = prettyPrint modIfcs mName mapBinds mapInsts listRules mapMeths listFps schedulerInf 
 				in ( modIfcs ,str ++ netlist))
 					(initialIfcs,"")
 					mods)
@@ -60,14 +60,9 @@ getModuleFpDefNames fs ds = concat $
 	[getMethNames FP name typ args | Fp name typ args <- fs] ++
 		[getMethNames DEF name typ args | (name, Method typ args _) <- Map.toList ds]
 
-prettyPrint (modIfcs,
-	mName,
-	mapBinds,
-	mapInsts,
-	listRules,
-	mapMeths,
-	listFps,
-	schedulerInf) =
+-- TODO method calls including instances
+-- Dealing with formal parameters
+prettyPrint modIfcs mName mapBinds mapInsts listRules mapMeths listFps schedulerInf =
 	if mName == "mkEHR" || mName == "mkRegFile"  
 		then "" 
 		else
@@ -98,31 +93,30 @@ prettyPrint (modIfcs,
 	where
 		fpDefNames = getModuleFpDefNames listFps mapMeths
 
-prettyPrintFp (n,size,args) =
-	prettyPrintMethod ("fp1_" ++ n, size, [("fp1_" ++ x,y) | (x,y) <- args]) ++
-	prettyPrintMethod ("fp2_" ++ n, size, [("fp2_" ++ x,y) | (x,y) <- args])
+{-
+				case (instWidth inst,instInit inst, instSize inst) of
+					(Expr None _ ,Expr None _ ,Expr None _ ) -> "\n" 
+					otherwise -> "#(" ++ (intercalate "," . Maybe.catMaybes $ [showExp . instWidth, showExp . instInit , showExp . instSize] <*> [inst] ) ++");\n" 
+-}
 
-prettyPrintMethod (n,size,args)=
-	(if size /= -1 then "\tinput " ++ wireSize size ++ n ++ " ;\n" else "") ++ 
-	"\tinput " ++ "RDY_" ++ n ++ " ;\n" ++ 
-	"\toutput " ++ "EN_" ++ n ++ " ;\n" ++
-	concatMap
-		(\(arg,s) -> "\toutput " ++ wireSize s ++ arg ++ ";\n" )
-		args	
 
+-- TAKE CARE OF EHRs and mkRegFile, including their wires
 prettyPrintInst modIfcs (name,inst) =
-	fpDefInstsW ++
-	"\t" ++ name ++
-	" " ++
-	(instModule inst) ++
-	case (instWidth inst,instInit inst, instSize inst) of
-		(Expr None _ ,Expr None _ ,Expr None _ ) -> "\n" 
-		otherwise -> "#(" ++ (intercalate "," . Maybe.catMaybes $ [showExp . instWidth, showExp . instInit , showExp . instSize] <*> [inst] ) ++");\n" 
-	++ "(.CLK(CLK), .RST_N(RST_N)"
-	++ fpDefInstsAll
-	++ ");\n"
+	if name == "mkEHR"
+		then ""
+			--"\t" ++ name ++ " mkEHR#(" show instWidth inst ++ ")();\n"
+		else if name == "mkRegFile"
+			then "\twire []"
+			else
+				fpDefInstsW ++
+				"\t" ++ name ++
+				" " ++
+				(instModule inst) ++
+				"(.CLK(CLK), .RST_N(RST_N)" ++
+				fpDefInstsAll ++
+				");\n"
 	where
-		fpDefInsts = getModuleFpDefNames (fpsInModule mod) (methodsInModule mod)
+		fpDefInsts = getModuleFpDefNames (fpsInModule mod) (Map.map (\(typ, args, _) -> (Method typ args [])) $ methodsInModule mod)
 			where mod = modIfcs Map.! instModule inst
 		fpDefInstsW = concat [ "\t wire " ++ y ++ name ++ "$" ++ z ++ ";\n" | (_, y, z) <- fpDefInsts]
 		fpDefInstsAll = concat [ ", ." ++ z ++ "(" ++ name ++ "$" ++ z ++ ")" | (_, _, z) <- fpDefInsts]
