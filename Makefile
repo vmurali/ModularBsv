@@ -1,7 +1,9 @@
-.PHONY: all clean
+.PHONY: clean
 
-all:
-	ghc --make -outputdir build ModularBsv.hs
+%:
+	ghc --make -outputdir build $*.hs -o Test
 
 clean:
-	rm -rf build ModularBsv
+	rm -rf build Test
+
+.DEFAULT_GOAL :=

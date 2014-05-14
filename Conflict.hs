@@ -1,132 +1,118 @@
 module Conflict where
 
-import Control.Monad
-import Control.Exception (assert)
-import Control.Applicative hiding ((<|>), many)
-import Data.Char
 import qualified Data.List as List
-import qualified Data.Maybe as Maybe
 import qualified Data.Map as Map
+import Control.Monad
+import Data.Char
+import qualified Data.Maybe as Maybe
 import qualified Data.String.Utils as S
 import qualified Data.Either as E
 import qualified Data.Set.Monad as Set
+import Debug.Trace
 
 import Algebra.Lattice  --SOOOO COOOL
 
 import DataTypes
-import Debug.Trace
+import CalledMethods
 
 instance JoinSemiLattice (Conflict) where
-  join C C = C
-  join C CF = C
-  join CF C = C
-  join C SA = C
-  join C SB = C
-  join SA C = C
-  join SB C = C
   join SA SB = C
   join SB SA = C
-  join CF SA = SA
+  join C _ = C
+  join _ C = C
+  join CF x = x
+  join x CF = x
   join SA SA = SA
-  join SA CF = SA
-  join CF SB = SB
   join SB SB = SB
-  join SB CF = SB
-  join CF CF = CF
+
+instance BoundedJoinSemiLattice (Conflict) where
+  bottom = CF
+
+instance Ord a => JoinSemiLattice (Set.Set a) where
+  join x y = Set.union x y
+
+instance Ord a => BoundedJoinSemiLattice (Set.Set a) where
+  bottom = Set.empty
+
+instToModule mod m = instModule $ instances mod Map.! m
+instToArgs mod m = instArgs $ instances mod Map.! m
 
 toActualArgs ::
   ModuleIfcs
-  -> Map.Map InstName [CalledMethod]
-  -> Map.Map InstName ModuleName
+  -> Module
   -> CalledMethod
-  -> Set.Set CalledMethod
-toActualArgs moduleIfcs instToArgs instToModule (m1, h1) =
-  foldl (\acc x -> Set.insert (fpsToArgs Map.! x) acc) Set.empty fpsMeth
+  -> [CalledMethod]
+toActualArgs moduleIfcs mod (m1, h1) =
+  foldl (\acc x -> (fpsToArgs Map.! x) : acc) [] fpsMeth
   where
-    fpsMeth = (fpsForMethodInModule $ (moduleIfcs Map.! (instToModule Map.! m1))) Map.! h1
-    fpsMod = fpsInModule (moduleIfcs Map.! (instToModule Map.! m1))
-    fpsToArgs = Map.fromList $ zip fpsMod (instToArgs Map.! m1)
+    (_, _, fpsMeth) = (methodsInModule $ (moduleIfcs Map.! (instToModule mod m1))) Map.!  h1 
+    fpsMod = fpsInModule (moduleIfcs Map.! (instToModule mod m1))
+    fpsToArgs = Map.fromList $ zip fpsMod (instToArgs mod m1)
 
-cmCalledMethods ::
-  ModuleIfcs
-  -> Map.Map InstName [CalledMethod]
-  -> Map.Map InstName ModuleName
-  -> (Map.Map (FpName, FpName) Conflict)
-  -> Set.Set CalledMethod
-  -> Map.Map (CalledMethod, CalledMethod) Conflict
-cmCalledMethods moduleIfcs instToArgs instToModule fpConf calles =
-  Set.foldl
-    (\acc1 (m1, h1) -> Set.foldl
-          (\acc2 (m2, h2) ->  Map.insert 
-                ((m1,h1),(m2,h2))
-                (conflict ((m1,h1),(m2,h2)))
-                acc2)
-          acc1
-          calles
-          )
-    Map.empty
-    calles
-  where 
-    conflict ((m1,h1),(m2,h2))
-      | m1 == "fp" , m2 == "fp" = fpConf Map.! (h1, h2)
-         | m1 == m2 = (cmForMethodsInModule $ moduleIfcs Map.! (instToModule Map.! m1)) Map.! (h1,h2)
-      | m1 == "fp" = let actCalles = Set.toList $ toActualArgs moduleIfcs instToArgs instToModule (m2, h2) in
-                       joins1 [conflict ((m1, h1), p) | p <- actCalles]
-      | m2 == "fp" = let actCalles = Set.toList $ toActualArgs moduleIfcs instToArgs instToModule (m1, h1) in
-                       joins1 [conflict (p, (m2, h2)) | p <- actCalles]
-      | otherwise =
-          let actCalles1 = Set.toList $ toActualArgs moduleIfcs instToArgs instToModule (m1, h1)
-              actCalles2 = Set.toList $ toActualArgs moduleIfcs instToArgs instToModule (m2, h2) in
-          joins1 [conflict (x, y) | x <- actCalles1, y <- actCalles2]
+
+cmCalledMethods :: ModuleIfcs -> Module -> CalledMethod -> CalledMethod -> Conflict
+cmCalledMethods modIfcs mod x y = joins . map (basicConflict modIfcs mod) . Set.elems $ dependenciesAll modIfcs mod (x,y)
+ 
+basicConflict modIfcs mod ((m1, h1),(m2, h2)) | fpM m1, fpM m2 =(fpConflict mod) Map.! (h1,h2)  
+			 		      | m1 == m2 = (cmForMethodsInModule $ modIfcs Map.! instToModule mod m1 ) Map.! (h1,h2)
+					      | otherwise  = CF 
+
+fpM m = m == "fp1" || m == "fp2" || m == "fp"
+
+buildDependenciesFunction modIfcs mod ((m1, h1),(m2, h2))   
+						| fpM m1 , fpM m2 = Set.singleton ((m1,h1),(m2,h2))   
+					   	| m1 == m2 = Set.singleton ((m1,h1),(m2,h2))
+					   	| fpM m1 = Set.fromList . map (\p -> ((m1,h1),p)) $ listFps2
+					   	| fpM m2 = Set.fromList . map (\p->  (p,(m2,h2))) $ listFps1
+					   	| otherwise = Set.fromList $ [(x,y) | x <- listFps1, y <- listFps2]  
+	where
+ 		listFps1 = toActualArgs modIfcs mod (m1,h1) 
+		listFps2 = toActualArgs modIfcs mod (m2,h2) 
+
+dependenciesExpand :: ModuleIfcs -> Module -> Set.Set (CalledMethod, CalledMethod) -> Set.Set (CalledMethod, CalledMethod)
+dependenciesExpand modIfcs mod x = Set.union (buildDependenciesFunction modIfcs mod =<< x) x
+
+dependenciesAll :: ModuleIfcs -> Module -> (CalledMethod, CalledMethod) -> Set.Set (CalledMethod, CalledMethod)
+dependenciesAll modIfcs mod x = lfpFrom (Set.singleton x) (dependenciesExpand modIfcs mod)
+
+thisM m = m == "this"
 
 fullCm ::
   ModuleIfcs
-  -> Map.Map InstName [CalledMethod]
-  -> Map.Map InstName ModuleName
-  -> (Map.Map (FpName, FpName) Conflict)
-  -> Map.Map ThisName (Set.Set CalledMethod)
-  -> Set.Set DefinedMethod -- The set of value0 methods
-  -> Map.Map (ThisName, ThisName) Conflict
-fullCm moduleIfcs instToArgs instToModule fpConf nameToCalles value0s =
-  foldl
-    (\acc1 n1 -> foldl
-        (\acc2 n2 -> Map.insert (n1, n2)
-                       (if n1 == n2
-                          then (if Set.member n1 value0s
-                                  then CF
-                                  else C)
-                          else (joins1 [cmCalled Map.! p| p <- confSet n1 n2])) acc2)
-        acc1
-        allNames
-    )
-    Map.empty
-    allNames
+  -> Module
+  -> PriorityElem
+  -> PriorityElem
+  -> Conflict
+fullCm moduleIfcs mod (m1, x1) (m2, x2) =
+ if thisM m1 && thisM m2 && x1 == x2 && Map.member x1 (methods mod)
+   then if margs == [] && isValue
+          then CF
+          else C
+   else   joins [cmCalledMethods moduleIfcs mod p q | p <- hs1, q <- hs2]
   where
-    allNames = Map.keys nameToCalles
-    calles = Map.fold (\x acc -> Set.union x acc) Set.empty nameToCalles
-    cmCalled = cmCalledMethods moduleIfcs instToArgs instToModule fpConf calles
-    confSet n1 n2 = [(x,y) | x <- (Set.toList $ nameToCalles Map.! n1), y <- (Set.toList $ nameToCalles Map.! n2)]
+    margs = methodArgs $ methods mod Map.! x1
+    mtype = methodType $ methods mod Map.! x1
+    isValue = case mtype of
+                Value _ -> True
+                otherwise -> False
+    hs1 = if thisM m1 && (Map.member x1 (rules mod) || Map.member x1 (methods mod))
+            then getCalled mod x1
+            else [(m1, x1)]
+    hs2 = if thisM m2 && (Map.member x2 (rules mod) || Map.member x2 (methods mod))
+            then getCalled mod x2
+            else [(m2, x2)]
+
+primitive mod = moduleName mod == "mkRegFile" || moduleName mod == "mkEHR" 
 
 fpu ::
   ModuleIfcs
-  -> Map.Map InstName [CalledMethod]
-  -> Map.Map InstName ModuleName
-  -> Map.Map DefinedMethod (Set.Set CalledMethod)
-  -> Map.Map DefinedMethod (Set.Set FpName)
-fpu moduleIfcs instToArgs instToModule defToCalles =
-  foldl (\acc d -> Map.insert d (Set.fromList (getFpus $ Set.toList (defToCalles Map.! d))) acc) Map.empty defs
+  -> Module
+  -> DefinedMethod
+  -> [FpName]
+fpu moduleIfcs mod def =
+  getFpus $ getCalled mod def
   where
-    defs = Map.keys defToCalles
     getFpus [] = []
     getFpus ((m, h) : xs)
-      | m == "fp" = h : getFpus xs
-      | otherwise = getFpus (Set.toList (toActualArgs moduleIfcs instToArgs instToModule (m, h)) ++ xs)
-
-{-
-getModuleIfc ::
-  ModuleIfcs
-  -> Module
-  -> ModuleIfc
-getModuleIfc moduleIfcs mod =
-  where
--}
+      | m == "fp" || m == "fp1" || m == "fp2" = h : getFpus xs
+      | otherwise = getFpus (List.nub $ toActualArgs moduleIfcs mod (m, h) ++ xs)
