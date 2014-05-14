@@ -42,25 +42,44 @@ toActualArgs ::
   -> Module
   -> CalledMethod
   -> [CalledMethod]
-toActualArgs moduleIfcs mod (m1, h1) =
+toActualArgs moduleIfcs mod (m1, h1) = List.nub $
   foldl (\acc x -> (fpsToArgs Map.! x) : acc) [] fpsMeth
   where
     (_, _, fpsMeth) = (methodsInModule $ (moduleIfcs Map.! (instToModule mod m1))) Map.!  h1 
     fpsMod = fpsInModule (moduleIfcs Map.! (instToModule mod m1))
     fpsToArgs = Map.fromList $ zip fpsMod (instToArgs mod m1)
 
+{-
+cmCalledMethods ::
+  ModuleIfcs
+  -> Module
+  -> CalledMethod
+  -> CalledMethod
+  -> Conflict
+cmCalledMethods moduleIfcs mod (m1, h1) (m2, h2)
+  | fpM m1, fpM m2 = fpConflict mod Map.! (h1, h2)
+  | m1 == m2 = (cmForMethodsInModule $ moduleIfcs Map.! (instToModule mod m1)) Map.! (h1,h2)
+  | fpM m1 = joins $ List.nub [cmCalledMethods moduleIfcs mod (m1, h1) q | q <- actCalles2]
+  | fpM m2 = joins $ List.nub [cmCalledMethods moduleIfcs mod p (m2, h2) | p <- actCalles1]
+  | otherwise = joins $ List.nub [cmCalledMethods moduleIfcs mod p q | p <- actCalles1, q <- actCalles2]
+  where
+    actCalles1 = toActualArgs moduleIfcs mod (m1, h1)
+    actCalles2 = toActualArgs moduleIfcs mod (m2, h2)
+-}
 
 cmCalledMethods :: ModuleIfcs -> Module -> CalledMethod -> CalledMethod -> Conflict
-cmCalledMethods modIfcs mod x y = joins . map (basicConflict modIfcs mod) . Set.elems $ dependenciesAll modIfcs mod (x,y)
+cmCalledMethods modIfcs mod x y =
+  joins . map (basicConflict modIfcs mod) . Set.toList $ dependenciesAll modIfcs mod (x,y)
  
-basicConflict modIfcs mod ((m1, h1),(m2, h2)) | fpM m1, fpM m2 =(fpConflict mod) Map.! (h1,h2)  
-			 		      | m1 == m2 = (cmForMethodsInModule $ modIfcs Map.! instToModule mod m1 ) Map.! (h1,h2)
-					      | otherwise  = CF 
+basicConflict modIfcs mod ((m1, h1),(m2, h2))
+								| fpM m1, fpM m2 =(fpConflict mod) Map.! (h1,h2)  
+								| m1 == m2 = (cmForMethodsInModule $ modIfcs Map.! instToModule mod m1 ) Map.! (h1,h2)
+								| otherwise  = CF 
 
 fpM m = m == "fp1" || m == "fp2" || m == "fp"
 
 buildDependenciesFunction modIfcs mod ((m1, h1),(m2, h2))   
-						| fpM m1 , fpM m2 = Set.singleton ((m1,h1),(m2,h2))   
+							| fpM m1 , fpM m2 = Set.singleton ((m1,h1),(m2,h2))   
 					   	| m1 == m2 = Set.singleton ((m1,h1),(m2,h2))
 					   	| fpM m1 = Set.fromList . map (\p -> ((m1,h1),p)) $ listFps2
 					   	| fpM m2 = Set.fromList . map (\p->  (p,(m2,h2))) $ listFps1

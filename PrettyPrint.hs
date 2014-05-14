@@ -88,12 +88,10 @@ prettyPrint (mName,
 			concat (List.map 
 				(\(n,bind) -> prettyPrintBindA (n,bind))   
 				$ Map.toList mapBinds)
-			{-
 			++
 			concat (List.map 
 				(\(n,l) -> prettyPrintSched n l) 
 				$ Map.toList schedulerInf)
-			-}
 			++ "endmodule\n"
 
 	where
