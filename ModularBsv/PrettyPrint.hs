@@ -60,11 +60,11 @@ prettyPrint (mName,
 				$ listRules)
 			++
 			concat (List.map 
-				(\(n,meth) -> prettyPrintDefinedMethod (n, extractSize $ methodType meth ,methodArgs meth))   
+				(\(n,meth) -> prettyPrintMethod (n, extractSize $ methodType meth ,methodArgs meth))   
 				$ Map.toList mapMeths)
 			++
 			concat (List.map 
-				(\(fp) -> prettyPrintDefinedMethod (fpName fp, extractSize $ fpType fp ,fpArgs fp))   
+				(\(fp) -> prettyPrintFp (fpName fp, extractSize $ fpType fp ,fpArgs fp))   
 				$ listFps)
 			++
 			concat (List.map 
@@ -97,28 +97,16 @@ prettyPrint (mName,
 
 
 prettyPrintFp (n,size,args) =
-	(if size /= -1 then "output " ++ (if size /= 0 then "[" ++ show (size-1) ++ ":0] " else "") ++ "fp1_"++ n ++ " ;\n" else "") ++ 
-	(if size /= -1 then "output " ++ (if size /= 0 then "[" ++ show (size-1) ++ ":0] " else "") ++ "fp2_"++ n ++ " ;\n" else "")  ++
-	"output " ++ "RDY_fp1_" ++ n ++ " ;\n" ++ 
-	"output " ++ "RDY_fp2_" ++ n ++ " ;\n" ++ 
-	"input " ++ "EN_fp1_" ++ n ++ " ;\n" ++
-	"input " ++ "EN_fp2_" ++ n ++ " ;\n" ++
-	concat (List.map
-			(\(arg,s) -> "input [" ++ show (s-1) ++ ":0] " ++ "fp1_" ++ arg ++ ";\n" ++
-					"input [" ++ show (s-1) ++ ":0] " ++ "fp2_" ++ arg ++ ";\n" )
-			args)	
+	prettyPrintMethod ("fp1_" ++ n, size, [("fp1_" ++ x,y) | (x,y) <- args]) ++
+	prettyPrintMethod ("fp2_" ++ n, size, [("fp2_" ++ x,y) | (x,y) <- args])
 
-prettyPrintDefinedMethod (n,size,args)=
-	(if size /= -1 then "input " ++ (if size /= 0 then "[" ++ show (size-1) ++ ":0] " else "") ++ "fp1_"++ n ++ " ;\n" else "") ++ 
-	(if size /= -1 then "input " ++ (if size /= 0 then "[" ++ show (size-1) ++ ":0] " else "") ++ "fp2_"++ n ++ " ;\n" else "") ++
-	"input " ++ "RDY_fp1_" ++ n ++ " ;\n" ++ 
-	"input " ++ "RDY_fp2_" ++ n ++ " ;\n" ++ 
-	"output " ++ "EN_fp1_" ++ n ++ " ;\n" ++
-	"output " ++ "EN_fp2_" ++ n ++ " ;\n" ++
-	concat (List.map
-			(\(arg,s) -> "output [" ++ show (s-1) ++ ":0] " ++ "fp_1" ++ arg ++ ";\n" ++
-					"output [" ++ show (s-1) ++ ":0] " ++ "fp_2" ++ arg ++ ";\n" )
-			args)	
+prettyPrintMethod (n,size,args)=
+	(if size /= -1 then "input " ++ wireSize size ++ n ++ " ;\n" else "") ++ 
+	"input " ++ "RDY_" ++ n ++ " ;\n" ++ 
+	"output " ++ "EN_" ++ n ++ " ;\n" ++
+	concatMap
+		(\(arg,s) -> "output " ++ wireSize s ++ arg ++ ";\n" )
+		args	
 
 
 
@@ -133,7 +121,7 @@ prettyPrintInst (name,inst) =
 	++ intercalate
 		","
 		(List.map 
-			(\(x,y)-> x++"_"++y)
+			(\(x,y)-> x++"$"++y)
 			$ instArgs inst)
 	++ ");\n"
 	where
@@ -143,16 +131,15 @@ prettyPrintInst (name,inst) =
 			[a] -> a 	 
 			otherwise -> "{"++intercalate "," l  ++ "}" 	
 
-
+wireSize int = if int > 1
+	then "[" ++ show (int - 1) ++ ":0] "
+	else ""
 
 prettyPrintBindW (bn, Binding ba bz bexpr) = 
   "wire " ++ case ba of 
 			Nothing -> ""
-			Just 0 -> "" 
-			Just val -> "[" ++ show (val-1) ++ ":0] "
-  ++ case bz of
-	0 -> ""
-	otherwise -> "[" ++ show (bz-1) ++ ":0] "
+			Just val -> wireSize val
+  ++ wireSize bz
   ++ bn ++ " ;\n"
 
 
@@ -164,12 +151,14 @@ prettyPrintBindA (bn, Binding ba bz bexpr) =
 prettyPrintExp (Expr op listArgs) = case op of 
 	None -> intercalate " " listArgs  
 	Unary s -> s ++ intercalate " " listArgs 
-	Binary s -> intercalate (" " ++ s ++ " ") listArgs
+	Binary s 
+		| s !! 0 /= '.' -> intercalate (" " ++ s ++ " ") listArgs
+		| otherwise -> "$signed("++listArgs !! 0 ++ ")" ++ tail s ++ "$signed(" ++ listArgs !! 1 ++ ")" 
 	Word s 
-	     | s == "concat" -> "{ " ++ intercalate (", ") listArgs ++ " }"
-	     | s == "extract" -> head listArgs ++ "[ " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2 ++ " ]" 
-	     | s == "_if_" -> head listArgs ++ " ? " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2
-	     | otherwise -> s  ++ "(" ++ (intercalate ", " listArgs) ++ ")"
+		| s == "concat" -> "{ " ++ intercalate (", ") listArgs ++ " }"
+		| s == "extract" -> head listArgs ++ "[ " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2 ++ " ]" 
+		| s == "_if_" -> head listArgs ++ " ? " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2
+		| otherwise -> s  ++ "(" ++ (intercalate ", " listArgs) ++ ")"
 	MethCall c-> "undefined" 
 	Rdy n -> "undefined"
 
