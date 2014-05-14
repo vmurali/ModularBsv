@@ -159,13 +159,18 @@ prettyPrintExp mapBinds (Expr op listArgs) = case op of
 		| s == "extract" -> head listArgs ++ "[ " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2 ++ " ]" 
 		| s == "_if_" -> head listArgs ++ " ? " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2
 		| s == "PrimBuildArray" -> ""
-		| s == "PrimArrayDynSelect" -> "" -- List.foldl (\(count, acc) x -> (count+1, acc ++ " : (" ++ x ++ " == " ++ show count ++ " ? " ++ ))
+		| s == "PrimArrayDynSelect" -> fst ( List.foldl (\(accstr,num) currentE ->(basicIfThenElse (sel ++ " == " ++ show num ) (arr !! num ) accstr, num-1 ) )
+								("",List.length arr-1)
+								arr) 
 		| otherwise -> s  ++ "(" ++ (intercalate ", " listArgs) ++ ")"
 	MethCall (x,y) -> x ++ "$" ++ y
 	Rdy (x, y) -> x ++ "$RDY_" ++ y
 	where
 		Expr _ arr = bindExpr $ mapBinds Map.! head listArgs
 		sel = listArgs !! 1
+
+basicIfThenElse i t e 	| e == "" = "( "++ i ++ " ? " ++ t ++ " )"
+			| otherwise ="( "++ i ++ " ? " ++ t ++ " :" ++ e ++ " )" 
 
 prettyPrintSched (x,y) l =
 	"\tassign EN_" ++ y ++ " = 1'b1" ++ concatMap (\(a,b) -> " && ! " ++ printTerm (a,b)  ) l ++ ";\n"
