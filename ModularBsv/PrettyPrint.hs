@@ -162,20 +162,19 @@ prettyPrintBindA (bn, Binding ba bz bexpr) =
 
 
 prettyPrintExp (Expr op listArgs) = case op of 
-   None -> intercalate " " listArgs  
-   Unary s -> s ++ intercalate " " listArgs 
-   Binary s -> intercalate (" " ++ s ++ " ") listArgs
-   Word s -> intercalate (" " ++ s ++ " ") listArgs
-     -- | s == "concat" -> "{" ++ intercalate (", ") listArgs ++ "}"
-   MethCall c-> "undefined" 
-   Rdy n -> "undefined"
+	None -> intercalate " " listArgs  
+	Unary s -> s ++ intercalate " " listArgs 
+	Binary s -> intercalate (" " ++ s ++ " ") listArgs
+	Word s 
+	     | s == "concat" -> "{ " ++ intercalate (", ") listArgs ++ " }"
+	     | s == "extract" -> head listArgs ++ "[ " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2 ++ " ]" 
+	     | s == "_if_" -> head listArgs ++ " ? " ++ listArgs !! 1 ++ " : " ++ listArgs !! 2
+	     | otherwise -> s  ++ "(" ++ (intercalate ", " listArgs) ++ ")"
+	MethCall c-> "undefined" 
+	Rdy n -> "undefined"
 
 prettyPrintSched (x,y) l =
-	"assign EN_" ++ y ++ " = " ++
-	intercalate
-		" && "
-		(List.map (\(a,b) -> "! " ++ printTerm (a,b)  ) l)	
-	++ ";\n"
+	"assign EN_" ++ y ++ " = 1'b1" ++ concatMap (\(a,b) -> " && ! " ++ printTerm (a,b)  ) l ++ ";\n"
 	where
 		printTerm (a,b) = if a == "fp" || a == "this" 
 				then "EN_" ++ b else "EN_" ++ a ++ "_" ++ b 
