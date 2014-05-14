@@ -21,8 +21,9 @@ main = do
 	case parsed of
     	--	Left _ -> putStrLn "Parse error: You think I will provide you useful information to help you debug your code: Not at all"
     		Left error -> putStrLn $ show error
-    		Right mods -> putStrLn 
-				. snd $ (List.foldl (\(acc,str) m -> 
+    		Right mods -> do
+				putStrLn ( show mods)
+				putStrLn . snd $ (List.foldl (\(acc,str) m -> 
       					let modIfcs = buildModuleIfc acc m
 					    mName = moduleName m
 					    mapBinds = bindings m
