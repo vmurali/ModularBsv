@@ -4,6 +4,7 @@ import Netlist
 import Conflict
 import ModuleParser
 import Scheduler
+import CalledMethods
 import System.IO
 import Text.Parsec
 import Text.Parsec.String
@@ -33,7 +34,7 @@ main = do
 				listFps = fps m
 				listRules = Map.keys $ rules m
 				schedulerInf = scheduler modIfcs m 
-				netlist = prettyPrint modIfcs mName mapBinds mapInsts listRules mapMeths listFps schedulerInf 
+				netlist = prettyPrint modIfcs m mName mapBinds mapInsts listRules mapMeths listFps schedulerInf 
 				in ( modIfcs ,str ++ netlist))
 					(initialIfcs,"")
 					mods)
@@ -62,7 +63,7 @@ getModuleFpDefNames fs ds = concat $
 
 -- TODO method calls including instances
 -- Dealing with formal parameters
-prettyPrint modIfcs mName mapBinds mapInsts listRules mapMeths listFps schedulerInf =
+prettyPrint modIfcs mod mName mapBinds mapInsts listRules mapMeths listFps schedulerInf =
 	if mName == "mkEHR" || mName == "mkRegFile"  
 		then "" 
 		else
@@ -79,7 +80,7 @@ prettyPrint modIfcs mName mapBinds mapInsts listRules mapMeths listFps scheduler
 				$ listRules)
 			++
 			concat (List.map 
-				(\(n,inst) -> prettyPrintInst modIfcs (n,inst))
+				(\(n,inst) -> prettyPrintInst mod modIfcs (n,inst))
 				$ Map.toList mapInsts )
 			++
 			concat (List.map 
@@ -99,19 +100,14 @@ prettyPrint modIfcs mName mapBinds mapInsts listRules mapMeths listFps scheduler
 					otherwise -> "#(" ++ (intercalate "," . Maybe.catMaybes $ [showExp . instWidth, showExp . instInit , showExp . instSize] <*> [inst] ) ++");\n" 
 -}
 
----b) EHRs - they should be handled very similar to how I have handle mkRegFile, except that the number of methods in mkEHR is based on ehrList [0..3] or whatever. The r0, r1, r2 methods have no parameters only result (so no EN, and no r0_x), and w0, w1, w2 methods have exactly one parameter w0_x, and no result. They have to be written for a parametric ehrList
----
----Can you take care of these two.
-
--- TAKE CARE OF EHRs, including their wires
-prettyPrintInst modIfcs (name,inst) =
+prettyPrintInst mod modIfcs (name,inst) =
 	if instModule inst == "mkEHR" --NO INSTANCE SIZE HERE
 		then  	concat [getWireForR i ++ getWireForW i | i <- ehrList ] ++ 
-			"\t" ++ name ++ " mkEHR#(" ++ getVal instWidth ++ ", " ++ getVal instInit ++ ")" ++
+			"\t" ++ name ++ " mkEHR#(" ++ getVal instWidth ++ ", " ++ getInit instInit ++ ")" ++
 			"(.CLK(CLK), .RST_N(RST_N)" ++ 	concat [valueOfEhr i ++   argsOfEhr i ++ enOfEhr i  | i<- ehrList] ++ 
 							 ");\n"
 		else if instModule inst == "mkRegFile"
-			then "\twire [" ++ getVal instSize ++ "-1:0] " ++ name ++ "$sub_x;\n" ++
+			then 	"\twire [" ++ getVal instSize ++ "-1:0] " ++ name ++ "$sub_x;\n" ++
 				"\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$sub;\n" ++
 				"\twire " ++ name ++ "$EN_sub;\n" ++
 				"\twire " ++ name ++ "$RDY_sub;\n" ++
@@ -131,6 +127,9 @@ prettyPrintInst modIfcs (name,inst) =
 								++ printArg "RDY_upd" name ++ "));\n"
 			else
 				fpDefInstsW ++
+				fst callerAllRdy ++ 
+				fst callerAllRes ++
+				concat [potentiallyInstanceCalledMethod name y  |   y <- Map.keys (methodsInModule $ modIfcs Map.! (instModule inst)) ]  ++
 				"\t" ++ name ++
 				" " ++
 				(instModule inst) ++ --TODO I THINK WE NEED A \n here
@@ -138,6 +137,81 @@ prettyPrintInst modIfcs (name,inst) =
 				fpDefInstsAll ++
 				");\n"
 	where
+		callerRes i fpMoName fpMeName modName = "\tassign "++ name ++ "$" ++ fpName ((fpsInModule (modIfcs  Map.! modName)) !! i)  
+							++ " = " ++ fpMoName ++ "$"++fpMeName ++ ";\n"
+		callerAllRes = List.foldl (\(str,i) (x,y) -> let (typ, _, _) = (methodsInModule (modIfcs Map.! instModule (instances mod Map.! x))) Map.! y
+							     in	(str ++ if isValueMethod typ  
+										then callerRes i x y (instModule inst)
+										else ""
+								,i+1)) ("",0) $ instArgs inst
+		callerRdy i fpMoName fpMeName modName = "\tassign "++ name ++ "$RDY_" ++ fpName ((fpsInModule (modIfcs  Map.! modName)) !! i)  
+							++ " = " ++ fpMoName ++ "$RDY_"++fpMeName ++ ";\n"
+		callerAllRdy = List.foldl (\(str,i) (x,y) -> (str ++ callerRdy i x y (instModule inst),i+1)) ("",0) $ instArgs inst
+		potentiallyFpCalled x y = undefined 
+		potentiallyInstanceCalledMethod x y =	let 	(typ, argsOfCalled, _) = (methodsInModule (modIfcs Map.! instModule (instances mod Map.! x))) Map.! y
+								callerOfCurrentThing = if not(Map.member (x,y) (getBothCaller mod) ) 
+												then [] 
+												else  ((getBothCaller mod) Map.! (x,y))
+							in	(if nonZeroVMethod typ argsOfCalled 
+									then enForCalled callerOfCurrentThing x y 
+									else "") ++
+								allArgsForCalled 
+									x
+									y
+									callerOfCurrentThing
+									(List.map fst (argsOfCalled))
+		isValueMethod typ = case typ of {Action -> False ; otherwise -> True}
+		nonZeroVMethod typ list = isValueMethod typ  && (list /= [])
+		enForCalled lC x y = 	let lFp = concat [findTheCalled localInst nI x y| (nI,localInst) <- Map.toList $ instances mod ] 
+					in "\tassign " ++ x ++ "$EN_" ++ y ++ " = " ++ intercalate "||" (List.filter (\x->x/=[]) [bigOr (lC), bigOrFp lFp]) ++ ";\n"
+		allArgsForCalled x y list argsNames = concat [ 	"\tassign " ++
+							x ++ "$" ++ (argsNames !! i)  ++ " = " ++
+							argsForCalledInAllFp i (argsForCalled i list) x y ++ ";\n" | i <- [0..List.length argsNames-1]] 
+		argsForCalledInAllFp i init a b = List.foldl
+							(\acc (n,localInst) -> 	let allCallInsideInst = findTheCalled localInst n a b 
+										in List.foldl 
+											(\acc1 (x,iN,lArgs) -> basicIfThenElse
+													(iN++"$EN_"++x++"= 1") --n=iN
+													(iN++"$"++ lArgs !! i)
+													acc1) 
+											acc 
+											allCallInsideInst)
+							init
+							(Map.toList $  instances mod) 
+		argsForCalled i lC = List.foldl
+					(\acc (n, cond, largs) -> basicIfThenElse
+								("EN_" ++ n ++ " = 1 && " ++ cond ++ " = 1")
+								( largs !! i)
+								acc)
+					"1" --DON'T CARE, it can't be accessed 
+					lC 
+		bigOrFp l = intercalate " || " $ List.map (\(x,y,lArgs) -> "("++y++"$EN_"++x++" = 1)") l 
+		bigOr list = intercalate " || " $ List.map
+							(\(n,cond,_)-> 	"(EN_" ++
+									n ++ " = 1 && " ++
+									cond++" = 1)") 
+							list   
+		findTheCalled myInst nI x y = 	let 	mname = instModule myInst
+							fpsOfCurrentModule = fpsInModule $ modIfcs Map.! mname  
+					   	in 	List.map (\number->	let targetFp = fpsOfCurrentModule !! number 
+										in (fpName targetFp, nI,List.map fst $ fpArgs targetFp ))
+								. fst $ List.foldl 
+								(\(list,numb) arg -> if arg == (x,y) 
+										then ((numb:list),numb+1) 
+										else (list, numb+1)) 
+								([] ,0) 
+								(instArgs myInst)
+		--End todo of the day
+		 {-
+data ModuleIfc = ModuleIfc
+  { fpsInModule :: [Fp]
+  , methodsInModule :: Map.Map DefinedMethod (TypeOfMethod, [(ArgName, Integer)], [FpName])
+  , cmForMethodsInModule :: Map.Map (DefinedMethod, DefinedMethod) Conflict
+  } deriving (Show,Eq,Ord)
+--getBothCaller :: Module -> Map.Map CalledMethod [(ThisName, String, [ArgName])]
+-}
+
+		getInit ins = let Expr _ args = ins inst in "{"++ intercalate "," args ++ "}"
 		printArg n1 n2 = ", ."++n1++"("++n2++"$"++n1++")"
 		getWireForR i = "\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$r"++ show i ++";\n" ++ 
 				"\twire " ++ name ++ "$RDY_r"++ show i ++";\n" 
@@ -145,7 +219,7 @@ prettyPrintInst modIfcs (name,inst) =
 				"\twire " ++ name ++ "$EN_w"++ show i ++";\n"++ 
 				"\twire " ++ name ++ "$RDY_w"++ show i ++";\n" 
 		argsOfEhr i = printArg ("w"++show i++"_x") name 
-		enOfEhr i =  printArg ("EN_w"++show i) name ++ printArg ("RDY_r" ++ show i) name 
+		enOfEhr i =  printArg ("EN_w"++show i) name ++ printArg ("RDY_w" ++ show i) name 
 		valueOfEhr i =  printArg ("r"++show i) name ++ printArg ("RDY_r" ++ show i) name 
 		getVal f = let Expr _ args = (f inst) in head args
 		fpDefInsts = getModuleFpDefNames (fpsInModule mod) (Map.map (\(typ, args, _) -> (Method typ args [])) $ methodsInModule mod)
@@ -191,6 +265,10 @@ prettyPrintExp mapBinds (Expr op listArgs) = case op of
 	where
 		Expr _ arr = bindExpr $ mapBinds Map.! head listArgs
 		sel = listArgs !! 1
+
+--getBothCaller :: Module -> Map.Map CalledMethod [(ThisName, String, [ArgName])]
+
+
 
 basicIfThenElse i t e 	| e == "" = "( "++ i ++ " ? " ++ t ++ " )"
 			| otherwise ="( "++ i ++ " ? " ++ t ++ " :" ++ e ++ " )" 
