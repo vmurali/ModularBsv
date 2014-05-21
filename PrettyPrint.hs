@@ -83,7 +83,7 @@ prettyPrint modIfcs mod mName mapBinds mapInsts listRules mapMeths listFps sched
 				(\(n,inst) -> prettyPrintInst mod modIfcs (n,inst))
 				$ Map.toList mapInsts )
 			++
-			prettyPrintCalledMethods mod modIfcs
+			prettyPrintCalledMethods mod modIfcs (getBothCaller mod)
 			++
 			concat (List.map 
 				(\(n,bind) -> prettyPrintBindA mapBinds (n,bind))   
@@ -170,7 +170,7 @@ prettyPrintInst mod modIfcs (name,inst) =
 	
 isNotActionMethod typ = case typ of {Action -> False ; otherwise -> True}
 
-prettyPrintCalledMethods mod modIfcs =
+prettyPrintCalledMethods mod modIfcs bothMod =
 	concat [potentiallyCalledMethod x y | (x, y) <- allDefinedMethods ++ allFps]
 	where
 		nonZeroVMethod typ list = not (case typ of {Value _ -> list == []; otherwise -> False})
@@ -213,9 +213,9 @@ prettyPrintCalledMethods mod modIfcs =
 									(typ, argsOfCalled, _) = if fpM x
 																						then let Fp _ t args = getFp y in (t, args, [])
 																						else (methodsInModule (modIfcs Map.! instModule (instances mod Map.! x))) Map.! y
-									callerOfCurrentThing = if not (Map.member (x, y) (getBothCaller mod))
+									callerOfCurrentThing = if not (Map.member (x, y) bothMod)
 																					then []
-																					else ((getBothCaller mod) Map.! (x, y))
+																					else (bothMod Map.! (x, y))
 		allArgsForCalled x y callerOfCurrentThing argsNames = concat [ 	"\tassign " ++
 							x ++ "$" ++ y ++ "_" ++ (argsNames !! i)  ++ " = " ++
 							argsForCalledInAllFp i (argsForCalled i callerOfCurrentThing) x y ++ ";\n" | i <- [0..List.length argsNames-1]] 
@@ -272,8 +272,6 @@ prettyPrintExp mapBinds (Expr op listArgs) = case op of
 	where
 		Expr _ arr = bindExpr $ mapBinds Map.! head listArgs
 		sel = listArgs !! 1
-
---getBothCaller :: Module -> Map.Map CalledMethod [(ThisName, String, [ArgName])]
 
 
 
