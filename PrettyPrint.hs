@@ -171,11 +171,11 @@ prettyPrintInst mod modIfcs (name,inst) =
 			otherwise -> "{"++intercalate "," l  ++ "}"
 	
 isNotActionMethod typ = case typ of {Action -> False ; otherwise -> True}
+nonZeroVMethod typ list = not (case typ of {Value _ -> list == []; otherwise -> False})
 
 prettyPrintCalledMethods mod modIfcs bothMod =
 	concat [potentiallyCalledMethod x y | (x, y) <- allDefinedMethods ++ allFps]
 	where
-		nonZeroVMethod typ list = not (case typ of {Value _ -> list == []; otherwise -> False})
 		orMethOrRuleCaller listOfCalls = intercalate " || " $ List.map
 							(\(rlName,cond,_)-> 	"(EN_" ++
 									rlName ++ " == 1'b1 && " ++
@@ -240,6 +240,55 @@ prettyPrintCalledMethods mod modIfcs bothMod =
 								acc)
 					"0" -- TO CHANGE
 					lC 
+
+fpWireDecl fpList =
+  List.foldl
+		(\acc (Fp name typ args) -> acc ++ "\twire fp1$RDY_" ++ name ++ ", fp2$RDY_" ++ name ++ ", fp1$EN_" ++ name ++ ", fp2$EN_" ++ name ++ ";\n" ++
+			(case typ of
+				Value size -> "\twire " ++ wireSize size ++ "fp1$" ++ name ++ ";\n" ++ "\twire " ++ wireSize size ++ "fp2$" ++ name ++ ";\n"
+				ActionValue size -> "\twire " ++ wireSize size ++ "fp1$" ++ name ++ ";\n" ++ "\twire " ++ wireSize size ++ "fp2$" ++ name ++ ";\n"
+				Action -> "") ++
+			(List.foldl
+				(\acc1 (arg, sz) -> acc1 ++ "\twire " ++ wireSize sz ++ "fp1$" ++ arg ++ ";\n" ++ "\twire " ++ wireSize sz ++ "fp2$" ++ arg ++ ";\n")
+				""
+				args
+			)
+		)
+		""
+		fpList
+
+fpWiresRdy nameOfFp = 
+	"\tassign fp1$RDY_" ++nameOfFp ++ " = RDY_" ++ nameOfFp ++ ";\n" ++
+	"\tassign fp2$RDY_" ++nameOfFp ++ " = RDY_" ++ nameOfFp ++ ";\n"
+
+fpWiresEn nameOfFp typ args =
+	if nonZeroVMethod typ args
+		then
+			"\tassign EN_" ++ nameOfFp ++ " = fp1$EN_" ++ nameOfFp ++
+			" || fp2$EN_"++ nameOfFp ++ ";\n" 
+		else ""
+
+fpWiresRes nameOfFp typ =
+	if isNotActionMethod typ
+		then
+			"\tassign fp1$" ++ nameOfFp ++ " = " ++ nameOfFp ++ ";\n" ++
+			"\tassign fp2$" ++ nameOfFp ++ " = " ++ nameOfFp ++ ";\n"
+		else ""
+
+
+fpWiresArgs nameOfFp args =
+	List.foldl 
+		(\acc (arg, _) -> acc ++ "\tassign " ++ arg ++ " = " ++  basicIfThenElse 
+																						(" fp1$EN_" ++ nameOfFp ++ " == 1b'1")
+																						("fp1$" ++ arg)
+																						("fp2$" ++ arg)
+																			 ++  ";\n")
+		""
+		args
+
+fpDoAll fpList =
+	fpWireDecl fpList ++
+	concat [fpWiresRdy name ++ fpWiresEn name typ args ++ fpWiresRes name typ ++ fpWiresArgs name args | Fp name typ args <- fpList]
 
 prettyPrintBindW (bn, Binding ba bz bexpr)
 	| Nothing <- ba = "\twire " ++ wireSize bz ++ bn ++ " ;\n"
