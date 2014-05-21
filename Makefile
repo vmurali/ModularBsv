@@ -1,7 +1,7 @@
 .PHONY: clean
 
 %:
-	ghc --make -outputdir build $*.hs -o Test
+	ghc --make -O2 -outputdir build $*.hs -o Test
 
 clean:
 	rm -rf build Test
