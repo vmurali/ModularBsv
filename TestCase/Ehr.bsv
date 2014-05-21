@@ -111,7 +111,7 @@ import "BVI"
 module mkRegFile#(String init)(RegFile#(idx, t)) provisos(Bits#(t, tSz), Bits#(idx, sz));
   parameter width = valueOf(tSz);
   parameter init = init;
-  parameter size = 1<<valueOf(sz);
+  parameter size = valueOf(sz);
   method sub0 sub(sub1);
   method upd(upd0, upd1) enable(upden);
 

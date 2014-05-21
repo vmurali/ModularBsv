@@ -50,11 +50,13 @@ data WhichMeth = FP | DEF
 getMethNames which name typ args =
 	(case which of {FP -> "input "; DEF -> "output "}, "", "RDY_" ++ name):
 	(case typ of
-		Value 0 -> []
+		Value size 	| args == [] -> []
+								| otherwise -> [(case which of {FP -> "output "; DEF -> "input "}, "", "EN_" ++ name)] 
 		otherwise -> [(case which of {FP -> "output "; DEF -> "input "}, "", "EN_" ++ name)] ) ++
 	(case typ of
+		Action -> []
 		Value size -> [(case which of {FP -> "input "; DEF -> "output "}, wireSize size, name)]
-		otherwise -> [] ) ++
+		ActionValue size -> [(case which of {FP -> "input "; DEF -> "output "}, wireSize size, name)] ) ++
 	[(case which of {FP -> "output "; DEF -> "input "}, wireSize y, x) | (x, y) <- args]
 
 getModuleFpDefNames fs ds = concat $
@@ -105,7 +107,7 @@ prettyPrint modIfcs mod mName mapBinds mapInsts listRules mapMeths listFps sched
 prettyPrintInst mod modIfcs (name,inst) =
 	if instModule inst == "mkEHR" --NO INSTANCE SIZE HERE
 		then  	concat [getWireForR i ++ getWireForW i | i <- ehrList ] ++ 
-			"\t" ++ name ++ " mkEHR#(" ++ getVal instWidth ++ ", " ++ getInit instInit ++ ")" ++
+			"\tmkEHR#(" ++ getVal instWidth ++ ", " ++ getInit instInit ++ ") " ++ name ++
 			"(.CLK(CLK), .RST_N(RST_N)" ++ 	concat [valueOfEhr i ++   argsOfEhr i ++ enOfEhr i  | i<- ehrList] ++ 
 							 ");\n"
 		else if instModule inst == "mkRegFile"
@@ -117,7 +119,7 @@ prettyPrintInst mod modIfcs (name,inst) =
 				"\twire [" ++ getVal instWidth ++ "-1:0] " ++ name ++ "$upd_y;\n" ++
 				"\twire " ++ name ++ "$EN_upd;\n" ++
 				"\twire " ++ name ++ "$RDY_upd;\n" ++
-				"\t" ++ name ++ " mkRegFile#(" ++ getVal instSize ++ ", " ++ getVal instWidth ++ ", " ++ getVal instInit ++ ")" ++
+				"\tmkRegFile#(" ++ getVal instSize ++ ", " ++ getVal instWidth ++ ", " ++ getVal instInit ++ ") " ++ name ++
 				"(.CLK(CLK), .RST_N(RST_N)"	
 								++ printArg "sub_x" name 
 								++ printArg "sub" name
@@ -126,15 +128,15 @@ prettyPrintInst mod modIfcs (name,inst) =
 								++ printArg "upd_x" name 
 								++ printArg "upd_y" name
 								++ printArg "EN_upd" name 
-								++ printArg "RDY_upd" name ++ "));\n"
+								++ printArg "RDY_upd" name ++ ");\n"
 			else
 				fpDefInstsW ++
 				fst callerAllRdy ++ 
 				fst callerAllRes ++
 				--concat [potentiallyCalledMethod name y  |   y <- Map.keys (methodsInModule $ modIfcs Map.! (instModule inst)) ]  ++
-				"\t" ++ name ++
+				"\t" ++ (instModule inst) ++
 				" " ++
-				(instModule inst) ++ --TODO I THINK WE NEED A \n here
+				name ++ --TODO I THINK WE NEED A \n here
 				"(.CLK(CLK), .RST_N(RST_N)" ++
 				fpDefInstsAll ++
 				");\n"
@@ -239,12 +241,9 @@ prettyPrintCalledMethods mod modIfcs bothMod =
 					"0" -- TO CHANGE
 					lC 
 
-prettyPrintBindW (bn, Binding ba bz bexpr) = 
-  "\twire " ++ case ba of 
-			Nothing -> ""
-			Just val -> wireSize val
-  ++ wireSize bz
-  ++ bn ++ " ;\n"
+prettyPrintBindW (bn, Binding ba bz bexpr)
+	| Nothing <- ba = "\twire " ++ wireSize bz ++ bn ++ " ;\n"
+	| otherwise = ""
 
 prettyPrintBindA mapBinds (bn, Binding ba bz bexpr) 
 	| Expr (Word x) _ <- bexpr, x=="PrimBuildArray" = "" 
