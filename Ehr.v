@@ -9,6 +9,30 @@ module mkEHR(CLK, RST_N, r0, RDY_r0, w0_x, EN_w0, RDY_w0, r1, RDY_r1, w1_x, EN_w
 	output [size-1:0] r0;
 	output [size-1:0] r1;
 	output [size-1:0] r2;
+
+	reg [size-1:0] d;
+	assign RDY_r0 = 1;
+	assign RDY_r1 = 1;
+	assign RDY_r2 = 1;
+	assign RDY_w0 = 1;
+	assign RDY_w1 = 1;
+	assign RDY_w2 = 1;
+	assign r0 = d;
+	assign r1 = EN_w0? w0_x: r0;
+	assign r2 = EN_w1? w1_x: r1;
+
+	always@(posedge CLK)
+	begin
+		if(!RST_N)
+			d <= init;
+		else
+			if(EN_w2 == 1'b1)
+				d <= w2_x;
+			else if(EN_w1 == 1'b1)
+				d <= w1_x;
+			else if(EN_w0 == 1'b1)
+				d <= w0_x;
+	end
 endmodule
 
 module mkRegFile(CLK, RST_N, sub_x, sub, EN_sub, RDY_sub, upd_x, upd_y, EN_upd, RDY_upd);
