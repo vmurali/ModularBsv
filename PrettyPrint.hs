@@ -265,6 +265,7 @@ prettyPrintExp mapBinds (Expr op listArgs) = case op of
 		| s == "PrimArrayDynSelect" -> fst ( List.foldl (\(accstr,num) currentE ->(basicIfThenElse (sel ++ " == " ++ show num ) (arr !! num ) accstr, num-1 ) )
 								("",List.length arr-1)
 								arr) 
+		| s == "sext" -> "$signed(" ++ intercalate ", " listArgs ++ ")"
 		| otherwise -> s  ++ "(" ++ (intercalate ", " listArgs) ++ ")"
 	MethCall (x,y) -> x ++ "$" ++ y
 	Rdy (x, y) -> x ++ "$RDY_" ++ y
