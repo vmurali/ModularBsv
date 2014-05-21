@@ -43,7 +43,16 @@ quotedString = do
   return $ "\"" ++ xs ++ "\""
 
 typedIdentifier =
-  parens (symbol "_" *> option "0" (brackets (try identifier <|> constant)) <* symbol "::" <* symbol "Bit" <* integer)
+  parens $ do
+    symbol "_"
+    ret <- optionMaybe (brackets (try identifier <|> constant))
+    symbol "::"
+    symbol "Bit"
+    sz <- integer
+    case ret of
+      Nothing -> return $ show sz ++ "'b0"
+      Just x -> return x
+--(symbol "_" *> option "0" (brackets (try identifier <|> constant)) <* symbol "::" <* symbol "Bit" <* integer)
 
 terminal = try typedIdentifier <|> try quotedString <|>
            try identifier <|> constant
