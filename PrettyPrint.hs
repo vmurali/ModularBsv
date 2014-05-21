@@ -219,7 +219,7 @@ prettyPrintCalledMethods mod modIfcs bothMod =
 																					then []
 																					else (bothMod Map.! (x, y))
 		allArgsForCalled x y callerOfCurrentThing argsNames = concat [ 	"\tassign " ++
-							x ++ "$" ++ y ++ "_" ++ (argsNames !! i)  ++ " = " ++
+							x ++ "$" ++ {- y ++ "_" ++ -} (argsNames !! i)  ++ " = " ++
 							argsForCalledInAllFp i (argsForCalled i callerOfCurrentThing) x y ++ ";\n" | i <- [0..List.length argsNames-1]] 
 		argsForCalledInAllFp i init a b = List.foldl
 							(\acc (n,localInst) ->

@@ -56,7 +56,7 @@ buildModuleIfc modIfcs mod = let gMod = getModuleIfc modIfcs mod in
 ehrList = [0..2]
 
 ehrIfc = ModuleIfc []
-  (fromList $ [("r" ++ show x, (Value 0, [], [])) | x <- ehrList] ++ [("w" ++ show x, (Action, [("x", 0)], [])) | x <- ehrList])
+  (fromList $ [("r" ++ show x, (Value 0, [], [])) | x <- ehrList] ++ [("w" ++ show x, (Action, [("w" ++ show x ++ "_x", 0)], [])) | x <- ehrList])
   (fromList $
       ([(("r" ++ show x, "r" ++ show y), if x < y then SB else if x == y then CF else SA)| x <- ehrList, y <- ehrList] ++
        [(("r" ++ show x, "w" ++ show y), if x <= y then SB else SA)| x <- ehrList, y <- ehrList] ++
@@ -64,5 +64,5 @@ ehrIfc = ModuleIfc []
        [(("w" ++ show x, "w" ++ show y), if x < y then SB else if x == y then C else SA)| x <- ehrList, y <- ehrList]))
 
 regFileIfc = ModuleIfc []
-  (fromList [("sub", (Value 1, [("x", 0)], [])), ("upd", (Action, [("x", 0), ("y", 0)], []))])
+  (fromList [("sub", (Value 1, [("sub_x", 0)], [])), ("upd", (Action, [("upd_x", 0), ("upd_y", 0)], []))])
   (fromList [(("sub", "sub"), C), (("upd", "upd"), C), (("sub", "upd"), SB), (("upd", "sub"), SA)])
