@@ -331,7 +331,7 @@ module mkProc(Proc);
     let dInst = decode(inst);
     let nextAddr <- handleDecodeRedirect(ex2dRedirect, dirPredRedirect, dInst, pc, ppc, fdEpoch, feEpoch);
 
-    //fpRule.t1(True);
+    fpRule.t1(True);
     if(isValid(nextAddr))
     begin
       d2rf.enq(Decode2RegRead{pc: pc, ppc: validValue(nextAddr), epoch: feEpoch, dInst: dInst});

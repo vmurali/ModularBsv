@@ -91,6 +91,8 @@ prettyPrint modIfcs mod mName mapBinds mapInsts listRules mapMeths listFps sched
 				(\(n,bind) -> prettyPrintBindA mapBinds (n,bind))   
 				$ Map.toList mapBinds)
 			++
+			fpDoAll listFps
+			++
 			concat (List.map 
 				(\(n,l) -> prettyPrintSched n l) 
 				$ Map.toList schedulerInf)
@@ -279,7 +281,7 @@ fpWiresRes nameOfFp typ =
 fpWiresArgs nameOfFp args =
 	List.foldl 
 		(\acc (arg, _) -> acc ++ "\tassign " ++ arg ++ " = " ++  basicIfThenElse 
-																						(" fpMeth$EN_" ++ nameOfFp ++ " == 1b'1")
+																						("fpMeth$EN_" ++ nameOfFp ++ " == 1'b1")
 																						("fpMeth$" ++ arg)
 																						("fpRule$" ++ arg)
 																			 ++  ";\n")
