@@ -58,8 +58,6 @@ basicConflict modIfcs mod ((m1, h1),(m2, h2))
 								| m1 == m2 = (cmForMethodsInModule $ modIfcs Map.! instToModule mod m1 ) Map.! (h1,h2)
 								| otherwise  = CF 
 
-fpM m = m == "fp1" || m == "fp2" || m == "fp"
-
 buildDependenciesFunction modIfcs mod ((m1, h1),(m2, h2))   
 							| fpM m1 , fpM m2 = Set.singleton ((m1,h1),(m2,h2))   
 					   	| m1 == m2 = Set.singleton ((m1,h1),(m2,h2))
@@ -115,5 +113,5 @@ fpu moduleIfcs mod def =
   where
     getFpus [] = []
     getFpus ((m, h) : xs)
-      | m == "fp" || m == "fp1" || m == "fp2" = h : getFpus xs
+      | fpM m = h : getFpus xs
       | otherwise = getFpus (List.nub $ toActualArgs moduleIfcs mod (m, h) ++ xs)

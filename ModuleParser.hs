@@ -63,16 +63,16 @@ moduleParser = do
   symbol "-- AP instance comments"
   --priorityList' <- option [] priorityParser
   instArgs'' <- many instArgsParser
-  let (priorityList', instArgs') = List.partition (\(id, _) -> id == "fp1") instArgs''
+  let (priorityList', instArgs') = List.partition (\(id, _) -> fpM id) instArgs''
   let instArgs = fromList [(x, if y == [] then [] else head y)|(x, y) <- instArgs']
   let priorityList = if priorityList' == [] then [] else let (_, vs) = head priorityList' in vs
-  let insts'' = if (insts' /= [] && let (nm, _, _, _, _, _, _) = head insts' in nm == "fp1")
+  let insts'' = if (insts' /= [] && let (nm, _, _, _, _, _, _) = head insts' in fpM nm)
                   then tail $ tail insts'
                   else insts'
   let insts = fromList [(name, Inst modName width init sz (findWithDefault [] name instArgs))
                         | (name, modName, _, width, init, sz, _) <- insts'']
   let (_, _, conflict, _, _, _, fps) = if (insts' /= [] &&
-                                           let (nm, _, _, _, _, _, _) = head insts' in nm == "fp1")
+                                           let (nm, _, _, _, _, _, _) = head insts' in fpM nm)
         then head insts'
         else (undefined, undefined, empty, undefined, undefined, undefined, [])
   symbol "-- AP remaining proof obligations"

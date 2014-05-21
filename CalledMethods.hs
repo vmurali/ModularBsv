@@ -90,9 +90,11 @@ getCalledMethods modIfcs Module{instances = ins, fps = fs} = Map.fromList $ inst
     instMeths = [((x, name), (case typ of {Value 0 -> True; otherwise -> False}, [x | (x, y) <- args])) |
       (x, y) <- Map.toList ins,
         (name, (typ, args, _)) <- Map.toList $ methodsInModule (modIfcs Map.! instModule y)]
-    fops = [(("fp1", name), (case typ of Value _ -> xs == []
-                                         otherwise -> False, [x | (x, y) <- xs])) |
+    fops = [(("fpMeth", name), (case typ of
+                                  Value _ -> xs == []
+                                  otherwise -> False, [x | (x, y) <- xs])) |
                        (Fp name typ xs) <- fs] ++
-           [(("fp2", name), (case typ of Value _ -> xs == []
-                                         otherwise -> False, [x | (x, y) <- xs])) |
+           [(("fpRule", name), (case typ of
+                                  Value _ -> xs == []
+                                  otherwise -> False, [x | (x, y) <- xs])) |
                        (Fp name typ xs) <- fs]

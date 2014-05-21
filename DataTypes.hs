@@ -95,3 +95,6 @@ data ModuleIfc = ModuleIfc
   } deriving (Show,Eq,Ord)
 
 type ModuleIfcs = Map.Map String ModuleIfc
+
+fpM m = m == "fpMeth" || m == "fpRule" || m == "fp"
+

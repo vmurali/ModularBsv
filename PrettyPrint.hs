@@ -200,7 +200,7 @@ prettyPrintCalledMethods mod modIfcs bothMod =
 				fpsOfInstModule = fpsInModule $ modIfcs Map.! mname
 		getFp y = List.head $ List.filter (\(Fp x _ _) -> x == y) (fps mod)
 		allDefinedMethods = [(x, z)|(x,y) <- Map.toList $ instances mod, z <- Map.keys $ methodsInModule (modIfcs Map.! instModule y)]
-		allFps = [("fp1", x)|Fp x _ _ <- fps mod] ++ [("fp2", x)|Fp x _ _ <- fps mod]
+		allFps = [("fpMeth", x)|Fp x _ _ <- fps mod] ++ [("fpRule", x)|Fp x _ _ <- fps mod]
 		potentiallyCalledMethod x y =
 							-- TAKE CARE OF FP IN THE NEXT LINE ALONE, THEN IT'S DONE
 								(if nonZeroVMethod typ argsOfCalled 
@@ -243,13 +243,13 @@ prettyPrintCalledMethods mod modIfcs bothMod =
 
 fpWireDecl fpList =
   List.foldl
-		(\acc (Fp name typ args) -> acc ++ "\twire fp1$RDY_" ++ name ++ ", fp2$RDY_" ++ name ++ ", fp1$EN_" ++ name ++ ", fp2$EN_" ++ name ++ ";\n" ++
+		(\acc (Fp name typ args) -> acc ++ "\twire fpMeth$RDY_" ++ name ++ ", fpRule$RDY_" ++ name ++ ", fpMeth$EN_" ++ name ++ ", fpRule$EN_" ++ name ++ ";\n" ++
 			(case typ of
-				Value size -> "\twire " ++ wireSize size ++ "fp1$" ++ name ++ ";\n" ++ "\twire " ++ wireSize size ++ "fp2$" ++ name ++ ";\n"
-				ActionValue size -> "\twire " ++ wireSize size ++ "fp1$" ++ name ++ ";\n" ++ "\twire " ++ wireSize size ++ "fp2$" ++ name ++ ";\n"
+				Value size -> "\twire " ++ wireSize size ++ "fpMeth$" ++ name ++ ";\n" ++ "\twire " ++ wireSize size ++ "fpRule$" ++ name ++ ";\n"
+				ActionValue size -> "\twire " ++ wireSize size ++ "fpMeth$" ++ name ++ ";\n" ++ "\twire " ++ wireSize size ++ "fpRule$" ++ name ++ ";\n"
 				Action -> "") ++
 			(List.foldl
-				(\acc1 (arg, sz) -> acc1 ++ "\twire " ++ wireSize sz ++ "fp1$" ++ arg ++ ";\n" ++ "\twire " ++ wireSize sz ++ "fp2$" ++ arg ++ ";\n")
+				(\acc1 (arg, sz) -> acc1 ++ "\twire " ++ wireSize sz ++ "fpMeth$" ++ arg ++ ";\n" ++ "\twire " ++ wireSize sz ++ "fpRule$" ++ arg ++ ";\n")
 				""
 				args
 			)
@@ -258,30 +258,30 @@ fpWireDecl fpList =
 		fpList
 
 fpWiresRdy nameOfFp = 
-	"\tassign fp1$RDY_" ++nameOfFp ++ " = RDY_" ++ nameOfFp ++ ";\n" ++
-	"\tassign fp2$RDY_" ++nameOfFp ++ " = RDY_" ++ nameOfFp ++ ";\n"
+	"\tassign fpMeth$RDY_" ++nameOfFp ++ " = RDY_" ++ nameOfFp ++ ";\n" ++
+	"\tassign fpRule$RDY_" ++nameOfFp ++ " = RDY_" ++ nameOfFp ++ ";\n"
 
 fpWiresEn nameOfFp typ args =
 	if nonZeroVMethod typ args
 		then
-			"\tassign EN_" ++ nameOfFp ++ " = fp1$EN_" ++ nameOfFp ++
-			" || fp2$EN_"++ nameOfFp ++ ";\n" 
+			"\tassign EN_" ++ nameOfFp ++ " = fpMeth$EN_" ++ nameOfFp ++
+			" || fpRule$EN_"++ nameOfFp ++ ";\n" 
 		else ""
 
 fpWiresRes nameOfFp typ =
 	if isNotActionMethod typ
 		then
-			"\tassign fp1$" ++ nameOfFp ++ " = " ++ nameOfFp ++ ";\n" ++
-			"\tassign fp2$" ++ nameOfFp ++ " = " ++ nameOfFp ++ ";\n"
+			"\tassign fpMeth$" ++ nameOfFp ++ " = " ++ nameOfFp ++ ";\n" ++
+			"\tassign fpRule$" ++ nameOfFp ++ " = " ++ nameOfFp ++ ";\n"
 		else ""
 
 
 fpWiresArgs nameOfFp args =
 	List.foldl 
 		(\acc (arg, _) -> acc ++ "\tassign " ++ arg ++ " = " ++  basicIfThenElse 
-																						(" fp1$EN_" ++ nameOfFp ++ " == 1b'1")
-																						("fp1$" ++ arg)
-																						("fp2$" ++ arg)
+																						(" fpMeth$EN_" ++ nameOfFp ++ " == 1b'1")
+																						("fpMeth$" ++ arg)
+																						("fpRule$" ++ arg)
 																			 ++  ";\n")
 		""
 		args

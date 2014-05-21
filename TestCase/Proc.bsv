@@ -140,8 +140,8 @@ module mkProc(Proc);
   //Instantiating all the state elements of the processor.
 
  // (* doc = "[this.r1 this.r2] [this.b1]"*)
-  let fp1 <- mkProc_fp;
-  let fp2 <- mkProc_fp;
+  let fpMeth <- mkProc_fp;
+  let fpRule <- mkProc_fp;
   let sb <- mkSb;
 
   // Architectural State
@@ -331,7 +331,7 @@ module mkProc(Proc);
     let dInst = decode(inst);
     let nextAddr <- handleDecodeRedirect(ex2dRedirect, dirPredRedirect, dInst, pc, ppc, fdEpoch, feEpoch);
 
-    //fp2.t1(True);
+    //fpRule.t1(True);
     if(isValid(nextAddr))
     begin
       d2rf.enq(Decode2RegRead{pc: pc, ppc: validValue(nextAddr), epoch: feEpoch, dInst: dInst});
