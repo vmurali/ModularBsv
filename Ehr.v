@@ -45,4 +45,18 @@ module mkRegFile(CLK, RST_N, sub_x, sub, EN_sub, RDY_sub, upd_x, upd_y, EN_upd, 
 	input [size-1:0] upd_x;
 	input [width-1:0] upd_y;
 	output [width-1:0] sub;
+
+	reg [width-1:0] d[0:(1<<size)-1];
+	assign RDY_sub = 1;
+	assign RDY_upd = 1;
+	assign sub = d[sub_x];
+
+	always@(posedge CLK)
+	begin
+		if(!RST_N)
+      $readmemh(file, d, 0, (1<<size)-1);
+		else
+			if(EN_upd)
+				d[upd_x] <= upd_y;
+	end
 endmodule
