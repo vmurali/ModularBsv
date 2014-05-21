@@ -1,4 +1,4 @@
---module PrettyPrint where
+module PrettyPrint where
 import DataTypes
 import Netlist
 import Conflict
@@ -6,38 +6,11 @@ import ModuleParser
 import Scheduler
 import CalledMethods
 import System.IO
-import Text.Parsec
-import Text.Parsec.String
 import Data.Map as Map
 import Data.Maybe as Maybe
 import Data.List as List
 import Control.Applicative
 import Text.Read as Read
-
-
-main :: IO ()
-main = do
-	filenameinput <- getLine
-	parsed <- parseFromFile modulesParser filenameinput
-	case parsed of
- 	--	Left _ -> putStrLn "Parse error: You think I will provide you useful information to help you debug your code: Not at all"
-		Left error -> putStrLn $ show error
-		Right mods -> do
-		--putStrLn ( show mods)
-		putStrLn . snd $ (List.foldl (\(acc,str) m -> 
-			let
-				modIfcs = buildModuleIfc acc m
-				mName = moduleName m
-				mapBinds = bindings m
-				mapInsts = instances m
-				mapMeths = methods m
-				listFps = fps m
-				listRules = Map.keys $ rules m
-				schedulerInf = scheduler modIfcs m 
-				netlist = prettyPrint modIfcs m mName mapBinds mapInsts listRules mapMeths listFps schedulerInf 
-				in ( modIfcs ,str ++ netlist))
-					(initialIfcs,"")
-					mods)
 
 initialIfcs = fromList [("mkEHR", ehrIfc), ("mkRegFile", regFileIfc)]
 
@@ -65,7 +38,7 @@ getModuleFpDefNames fs ds = concat $
 
 -- TODO method calls including instances
 -- Dealing with formal parameters
-prettyPrint modIfcs mod mName mapBinds mapInsts listRules mapMeths listFps schedulerInf =
+prettyPrint modIfcs mod =
 	if mName == "mkEHR" || mName == "mkRegFile"  
 		then "" 
 		else
@@ -99,6 +72,13 @@ prettyPrint modIfcs mod mName mapBinds mapInsts listRules mapMeths listFps sched
 			++ "endmodule\n"
 	where
 		fpDefNames = getModuleFpDefNames listFps mapMeths
+		mName = moduleName mod
+		mapBinds = bindings mod
+		mapInsts = instances mod
+		mapMeths = methods mod
+		listFps = fps mod
+		listRules = Map.keys $ rules mod
+		schedulerInf = scheduler modIfcs mod
 
 {-
 				case (instWidth inst,instInit inst, instSize inst) of

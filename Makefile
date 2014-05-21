@@ -1,9 +1,9 @@
-.PHONY: clean
+.PHONY: clean all
 
-%:
-	ghc --make -funfolding-use-threshold=16 -O2 -outputdir build $*.hs -o Test
+all:
+	ghc --make -funfolding-use-threshold=16 -O2 -outputdir build ModularBsv.hs
 
 clean:
-	rm -rf build Test
+	rm -rf build ModularBsv
 
-.DEFAULT_GOAL :=
+.DEFAULT_GOAL := all
