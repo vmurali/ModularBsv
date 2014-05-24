@@ -67,7 +67,7 @@ prettyPrint modIfcs mod =
 			fpDoAll listFps
 			++
 			concat (List.map 
-				(\(n,l) -> prettyPrintSched n l) 
+				(\(n,l) -> prettyPrintSched n l mod) 
 				$ Map.toList schedulerInf)
 			++ "endmodule\n"
 	where
@@ -310,9 +310,10 @@ basicIfThenElse i t e
 			| e == "" = "( " ++ t ++ " )"
 			| otherwise ="( "++ i ++ " ? " ++ t ++ " :" ++ e ++ " )" 
 
-prettyPrintSched (x,y) l =
-	"\tassign EN_" ++ y ++ " = 1'b1" ++ concatMap (\(a,b) -> " && ! " ++ printTerm (a,b)  ) l ++ ";\n"
+prettyPrintSched (x,y) l mod =
+	"\tassign EN_" ++ y ++ " = " ++ guard ++ concatMap (\(a,b) -> " && ! " ++ printTerm (a,b)  ) l ++ ";\n"
 	where
+		guard = if x == "this" then ruleGuard $ rules mod Map.! y else "1'b1"
 		printTerm (a,b) = if a == "fp" || a == "this" 
 				then "EN_" ++ b else "EN_" ++ a ++ "_" ++ b 
 
