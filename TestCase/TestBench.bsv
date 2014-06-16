@@ -22,6 +22,7 @@ typedef enum {Start, Run} State deriving (Bits, Eq);
 
 (* synthesize *)
 module mkTestBench();
+  (* doc = "cycle._read() " *)
   Proc proc <- mkProc;
 
   Reg#(Bit#(32)) cycle <- mkReg(0);
